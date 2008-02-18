@@ -1,0 +1,21 @@
+- text based encoding wieder fuer angenehmeres debuggen vielleicht (?)
+
+x rollforward until, restore until, usw...
+
+- tutorial fertig schreiben
+
+- import-image anschauen, nicht mehr failsafe
+
+- Revise and document make-object und initargs behaviour.  Upon
+  restore, initargs for transient slots are ignored now, but this is
+  not completely thought out.  It would better not to log initargs for
+  transient slots in the first place.
+
+- tx-persistent-change-class does not maintain indices
+
+- XXXX broken initialize-persistent-instance (?)
+
+- Within anonymous transactions, circular dependencies are not
+  correctly serialized.  Thus, an object that is created in the
+  anonymous transactions links itself to another object, it may fail
+  to restore correctly.  See anon-circular-test.lisp for an example.
