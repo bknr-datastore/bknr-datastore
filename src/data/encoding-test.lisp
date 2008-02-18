@@ -17,22 +17,22 @@
 
 (defun congruent-p (a b)
   "Are lisp value A and B (deeply) congruent?"
-  (let ((path-a "/tmp/a.pwgl-tmp")
-	(path-b "/tmp/b.pwgl-tmp"))
-    (cl-store:store a path-a)
-    (cl-store:store b path-b)
-    (prog1
-	(files-identical-content-p path-a path-b)
-      (delete-file path-a)
-      (delete-file path-b))))
+  (bknr.utils:with-temp-file (path-a)
+    (bknr.utils:with-temp-file (path-b)
+      (cl-store:store a path-a)
+      (cl-store:store b path-b)
+      (prog1
+          (files-identical-content-p path-a path-b)
+        (delete-file path-a)
+        (delete-file path-b)))))
 
 (defun copy-by-encoding (value)
-  (with-open-file (out "/tmp/bknr-encoding-test.tmp" :direction :output :if-exists :supersede
-                       :element-type '(unsigned-byte 8))
-    (encode value out))
-  (with-open-file (in "/tmp/bknr-encoding-test.tmp"
-                      :element-type '(unsigned-byte 8))
-    (decode in)))
+  (bknr.utils:with-temp-file (path)
+    (with-open-file (out path :direction :output :if-exists :supersede
+                         :element-type '(unsigned-byte 8))
+      (encode value out))
+    (with-open-file (in path :element-type '(unsigned-byte 8))
+      (decode in))))
 
 (defmacro test-encoding (name value)
   (let ((options (arnesi:ensure-list name)))
@@ -653,4 +653,3 @@ bar")
 ;;   (when (probe-file *test-file*)
 ;;     (ignore-errors (delete-file *test-file*))))
 
-;; ;; EOF
