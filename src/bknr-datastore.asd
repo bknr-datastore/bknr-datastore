@@ -29,7 +29,7 @@
                                             (:file "blob" :depends-on ("txn" "object" "package"))))))
 
 (defsystem :bknr-datastore-test  
-  :depends-on (:bknr-datastore :FiveAM)
+  :depends-on (:bknr-datastore :FiveAM :cl-store)
   :components ((:module "data" :components ((:file "encoding-test")
                                             ))))
 
