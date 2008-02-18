@@ -140,6 +140,9 @@ bar")
                (make-array '(2 2) :initial-contents '((1 1) (1 1))))
 
 (test-encoding array.3
+               (make-array '(2 2) :element-type 'fixnum :initial-element 3))
+
+(test-encoding array.3b
                (make-array '(2 2) :element-type '(mod 10) :initial-element 3))
 
 (test-encoding array.4
@@ -209,14 +212,15 @@ bar")
 ;; to (make-hash-table) with ecl.
 
 (test-encoding hash.1 (make-hash-table))
+(test-encoding hash.2 (make-hash-table :test #'equal))
 
-(defvar *hash* (let ((in (make-hash-table :test #'equal 
-                                          :rehash-threshold 0.4 :size 20
-                                          :rehash-size 40)))
-                 (dotimes (x 1000) (setf (gethash (format nil "~R" x) in) x))
-                 in))
+;; (defvar *hash* (let ((in (make-hash-table :test #'equal 
+;;                                           :rehash-threshold 0.4 :size 20
+;;                                           :rehash-size 40)))
+;;                  (dotimes (x 1000) (setf (gethash (format nil "~R" x) in) x))
+;;                  in))
 
-(test-encoding hash.2 *hash*)
+;; (test-encoding hash.3 *hash*)
 
 
 ;; ;; packages
