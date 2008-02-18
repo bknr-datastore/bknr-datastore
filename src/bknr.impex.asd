@@ -3,16 +3,11 @@
 (in-package :cl-user)
 
 (defpackage :bknr.impex.system
-  (:use :cl :asdf)
-  (:export #:*bknr-impex-directory*))
+  (:use :cl :asdf))
 
 (in-package :bknr.impex.system)
 
-(defparameter *bknr-impex-directory*
-    (make-pathname :name nil :type nil :version nil
-		   :defaults (parse-namestring *load-truename*)))
-
-(defsystem :bknr-impex
+(defsystem :bknr.impex
   :name "BKNR impex"
   :author "Manuel Odendahl <manuel@bl0rg.net>"
   :version "0"
@@ -21,7 +16,7 @@
   :description "BKNR XML import/export"
   :long-description ""
 
-  :depends-on (:cl-interpol :cxml :closer-mop :bknr-utils :bknr-xml :bknr-indices)
+  :depends-on (:cl-interpol :cxml :closer-mop :bknr.utils :bknr.xml :bknr.indices)
 
   :components ((:module "xml-impex"
 			:components

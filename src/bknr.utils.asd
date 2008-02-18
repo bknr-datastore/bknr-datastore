@@ -7,7 +7,7 @@
 
 (in-package :bknr.utils.system)
 
-(defsystem :bknr-utils
+(defsystem :bknr.utils
     :name "baikonour"
     :author "Hans Huebner <hans@huebner.org>"
     :author "Manuel Odendahl <manuel@bl0rg.net>"

@@ -5,7 +5,7 @@
 
 (in-package :bknr.skip-list.system)
 
-(defsystem :bknr-skip-list
+(defsystem :bknr.skip-list
     :name "skip-list"
     :author "Manuel Odendahl <manuel@bl0rg.net>"
     :version "0"

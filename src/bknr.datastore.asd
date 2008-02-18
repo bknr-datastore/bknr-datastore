@@ -2,12 +2,12 @@
 
 (in-package :cl-user)
 
-(defpackage :bknr-datastore.system
+(defpackage :bknr.datastore.system
   (:use :cl :asdf))
 
-(in-package :bknr-datastore.system)
+(in-package :bknr.datastore.system)
 
-(defsystem :bknr-datastore
+(defsystem :bknr.datastore
   :name "baikonour datastore"
   :author "Hans Huebner <hans@huebner.org>"
   :author "Manuel Odendahl <manuel@bl0rg.net>"
@@ -19,8 +19,8 @@
   :depends-on (:cl-interpol
                :closer-mop
                :unit-test
-               :bknr-utils
-               :bknr-indices)
+               :bknr.utils
+               :bknr.indices)
 
   :components ((:module "data" :components ((:file "package")
                                             (:file "encoding" :depends-on ("package"))
@@ -28,11 +28,11 @@
                                             (:file "object" :depends-on ("txn" "package"))
                                             (:file "blob" :depends-on ("txn" "object" "package"))))))
 
-(defsystem :bknr-datastore-test  
-  :depends-on (:bknr-datastore :fiveam :cl-store :bknr-utils)
+(defsystem :bknr.datastore.test  
+  :depends-on (:bknr.datastore :fiveam :cl-store :bknr.utils)
   :components ((:module "data" :components ((:file "encoding-test")
                                             ))))
 
-(defmethod asdf:perform ((op asdf:test-op) (system (eql (find-system :bknr-datastore))))
-  (asdf:oos 'asdf:load-op :bknr-datastore-test)
+(defmethod asdf:perform ((op asdf:test-op) (system (eql (find-system :bknr.datastore))))
+  (asdf:oos 'asdf:load-op :bknr.datastore.test)
   (funcall (intern (string :run!) (string :it.bese.FiveAM)) :bknr.datastore))
