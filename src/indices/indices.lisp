@@ -108,7 +108,7 @@ the hash-table entry already contains a value, an error is thrown."
 (defclass string-unique-index (unique-index)
   ())
 
-(defmethod initialize-instance :after ((index string-unique-index) &key (test #'equal) &allow-other-keys)
+(defmethod initialize-instance :after ((index string-unique-index) &key (test #'equal))
   (with-slots (hash-table) index
     (setf hash-table (make-hash-table :test test))))
 
@@ -164,7 +164,7 @@ the hash-table entry already contains a value, an error is thrown."
   ((index-superclasses :initarg :index-superclasses :initform nil
 		       :reader class-index-index-superclasses)))
   
-(defmethod initialize-instance :after ((index class-index) &key index-superclasses &allow-other-keys)
+(defmethod initialize-instance :after ((index class-index) &key index-superclasses)
   (setf (slot-value index 'index-superclasses)
 	index-superclasses))
 
@@ -231,7 +231,7 @@ the hash-table entry already contains a value, an error is thrown."
 	       :initform nil)
    (array :initarg :array :accessor array-index-array)))
 
-(defmethod initialize-instance :after ((index array-index) &key slots dimensions &allow-other-keys)
+(defmethod initialize-instance :after ((index array-index) &key slots dimensions)
   (setf (array-index-array index) (make-array dimensions :initial-element nil)
 	(array-index-slot-names index) slots))
 
@@ -320,8 +320,7 @@ the hash-table entry already contains a value, an error is thrown."
    (index-nil :initarg :index-nil :initform nil
 	      :accessor skip-list-index-index-nil)))
 
-(defmethod initialize-instance :after ((index skip-list-index) &key 
-				       slots index-nil &allow-other-keys)
+(defmethod initialize-instance :after ((index skip-list-index) &key slots index-nil)
   (unless (<= (length slots) 1)
     (error "Can not create slot-index with more than one slot."))
   (with-slots (skip-list slot-name) index
@@ -374,9 +373,11 @@ the hash-table entry already contains a value, an error is thrown."
     (nreverse vals)))
 
 (defmethod cursor-next ((slc skip-list-cursor) &optional eoc)
+  (declare (ignore eoc))
   (sl-cursor-next slc))
 
 (defmethod cursor-prev ((slc skip-list-cursor) &optional eoc)
+  (declare (ignore eoc))
   (sl-cursor-prev slc))
 
 (defmethod index-values-cursor ((index skip-list-index))

@@ -92,7 +92,7 @@ also index subclasses of the class to which the slot belongs, default is T")
       (superclasses class))
     (nreverse result)))
 
-(defmethod direct-slot-definition-class ((class indexed-class) &key index index-type &allow-other-keys)
+(defmethod direct-slot-definition-class ((class indexed-class) &key index index-type)
   (if (or index index-type)
       'index-direct-slot-definition
       (call-next-method)))
@@ -233,15 +233,27 @@ also index subclasses of the class to which the slot belongs, default is T")
   (compute-class-indices class (indexed-class-index-definitions class))
   (reinitialize-class-indices class))
 
+(defun validate-index-declaration (class indices)
+  (dolist (index indices)
+    (when (and (getf (cdr index) :index)
+               (getf (cdr index) :index-type))
+      (error "Can't have both :INDEX and :INDEX-TYPE in index ~A of ~A" (car index) class))))
+
+(defmethod initialize-instance :before ((class indexed-class) &key class-indices)
+  (validate-index-declaration class class-indices))
+
+(defmethod reinitialize-instance :before ((class indexed-class) &key class-indices)
+  (validate-index-declaration class class-indices))
+
 ;;; avoid late instantiation
 
 #+(or allegro cmu openmcl sbcl)
-(defmethod initialize-instance :after ((class indexed-class) &key &allow-other-keys)
+(defmethod initialize-instance :after ((class indexed-class) &key)
   (compute-class-indices class (indexed-class-index-definitions class))
   (reinitialize-class-indices class))
 
 #+(or allegro cmu openmcl sbcl)
-(defmethod reinitialize-instance :after ((class indexed-class) &key &allow-other-keys)
+(defmethod reinitialize-instance :after ((class indexed-class) &key)
   (compute-class-indices class (indexed-class-index-definitions class))
   (reinitialize-class-indices class))
 
@@ -258,7 +270,7 @@ also index subclasses of the class to which the slot belongs, default is T")
 	    (index-reinitialize (index-holder-index holder)
 				(index-holder-index old-holder))))))))
 
-(defmethod reinitialize-instance :before ((class indexed-class) &key &allow-other-keys)
+(defmethod reinitialize-instance :before ((class indexed-class) &key)
   (setf (indexed-class-old-indices class) (indexed-class-indices class)
 	(indexed-class-indices class) nil))
 
@@ -311,8 +323,7 @@ also index subclasses of the class to which the slot belongs, default is T")
 
 (defvar *indices-remove-p* t)
 
-(defmethod make-instance :around ((class indexed-class) &rest initargs)
-  (declare (ignore initargs))
+(defmethod make-instance :around ((class indexed-class) &key)
   (let* ((*in-make-instance-p* t)
 	 (object (call-next-method))
 	 (added-indices)

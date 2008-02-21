@@ -120,7 +120,7 @@
 	 :accessor category-index-tree))
   (:default-initargs :test #'equal))
 
-(defmethod initialize-instance :after ((index category-index) &key (tree-test #'eql) &allow-other-keys)
+(defmethod initialize-instance :after ((index category-index) &key (tree-test #'eql))
   (with-slots (tree) index
     (setf tree (make-category-tree :test tree-test))))
 

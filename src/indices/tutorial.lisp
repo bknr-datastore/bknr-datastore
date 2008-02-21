@@ -555,9 +555,7 @@ SLOT-NAME is used as a key to the internal hash-table.")
 	      :documentation "If T, NIL is used as a valid slot
  value, else slots with NIL value are treated as unbound slots.")))
 
-(defmethod initialize-instance :after
-    ((index slot-index) &key (test #'eql) slots index-nil
-     &allow-other-keys)
+(defmethod initialize-instance :after ((index slot-index) &key (test #'eql) slots index-nil)
   (unless (<= (length slots) 1)
     (error "Can not create slot-index with more than one slot."))
   (with-slots (hash-table slot-name) index

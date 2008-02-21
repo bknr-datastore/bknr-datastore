@@ -127,7 +127,7 @@ deleted, slot reads will return nil."
 (defclass store-object ()
   ((id :initarg :id :reader store-object-id
        :index-type unique-index
-       :index-initargs (:test #'eql :rehash-size 10000 :size 10000)
+       :index-initargs (:test #'eql)
        :index-reader store-object-with-id :index-values all-store-objects
        :index-mapvalues map-store-objects))
   (:metaclass persistent-class)
