@@ -118,6 +118,11 @@
 ;;;
 ;;; Using the `INDEXED-CLASS', we can redefine our gorilla example.
 
+;;; Before we are able to refine GORILLA with a new metaclass, we need
+;;; to delete the old class definition:
+
+(setf (find-class 'gorilla) nil)
+
 (defclass gorilla ()
   ((name :initarg :name :reader gorilla-name
 	 :index-type unique-index
@@ -129,6 +134,10 @@
 		:index-type hash-index
 		:index-reader gorillas-with-description))
   (:metaclass indexed-class))
+
+(defmethod print-object ((gorilla gorilla) stream)
+  (print-unreadable-object (gorilla stream :type t)
+    (format stream "~S" (gorilla-name gorilla))))
 
 ;;; We have to recreate the gorillas though, as the old instances
 ;;; don't get updated for now.
@@ -418,6 +427,10 @@
 (test-with-coords '(5 5 0))
 ; => #<TEST-CLASS2 5,5,0>
 
+#|
+
+;;; XXX the class index tutorial needs updating, please skip to next section!
+
 ;;; Another example of a class index is the `CLASS-INDEX' index.
 
 (defvar *class-index*
@@ -474,6 +487,7 @@
 (objects-of-class 'base-object)
 ; => NIL
 ; NIL
+|#
 
 ;;;## Destroying objects
 ;;;
@@ -484,12 +498,12 @@
 ;;; that not slot-access is possible anymore on the object.
 
 (let ((obj (test-with-coords '(5 5 0))))
-		 (destroy-object obj))
+  (destroy-object obj)
 
 ;;; This will throw an error.
 ;;;
 
-(test-class-x obj)
+  (test-class-x obj))
 
 ;;;## Class and object reinitialization
 ;;;

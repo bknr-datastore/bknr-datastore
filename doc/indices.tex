@@ -448,20 +448,20 @@ Another example of a class index is the `CLASS-INDEX' index.
 
 \begin{Verbatim}[fontsize=\small,frame=leftline,framerule=0.9mm,rulecolor=\color{gray},framesep=5.1mm,xleftmargin=5mm,fontfamily=cmtt]
 (defvar *class-index*
-  (index-create 'class-index :index-subclasses t))
+  (index-create 'class-index :index-subclasses t :slot-name 'id))
+(defvar *object-id* 0)
 
 (defclass base-object ()
-  ()
+  ((id :initform (incf *object-id*)))
   (:metaclass indexed-class)
   (:class-indices (class :index *class-index*
-          :slots nil
           :index-reader objects-of-class
           :index-values all-objects
           :index-subclasses t
           :index-keys all-class-names)
         (classes :index-type class-index
             :index-initargs (:index-superclasses t)
-            :slots nil
+            :slots (id)
             :index-subclasses t
             :index-reader objects-with-class)))
 
