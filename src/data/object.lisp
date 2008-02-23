@@ -49,7 +49,7 @@
 (defmethod reinitialize-instance :after ((class persistent-class) &rest args)
   (declare (ignore args))
   (determine-transient-slot-initargs class)
-  (when *store*
+  (when (and (boundp '*store*) *store*)
     (update-instances-for-changed-class (class-name class))
     (unless *suppress-schema-warnings*
       (warn "Class ~A has been changed. To ensure correct schema evolution, please snapshot your datastore."
