@@ -29,7 +29,9 @@
 	  when (pathname-name file) do (delete-file file)
 	  unless (pathname-name file) do (delete-directory file))
     #+sbcl
-    (sb-posix:rmdir (namestring pathname))))
+    (sb-posix:rmdir (namestring pathname))
+    #+openmcl
+    (ccl::recursive-delete-directory pathname)))
 
 (defvar *test-datastore-directory* #p"/tmp/test-datastore/")
 (defvar *test-datastore* nil)
@@ -47,10 +49,11 @@
   `(make-instance 'datastore-test-class
     :unit :datastore
     :name ,name
-    :body #'(lambda () ,@body)))
+    :body (lambda ()
+            ,@body)))
 
 (define-datastore-test "Datastore setup"
-  (test-assert *test-datastore*))
+    (test-assert *test-datastore*))
 
 (define-datastore-test "Create object"
     (let ((obj (make-object 'store-object)))
@@ -103,12 +106,11 @@
 
 (define-datastore-test "Stress test object creation"
     (format t "Creating ~a objects~%" +stress-size+)
-    (time (bknr.datastore::without-sync ()
-	    (dotimes (i +stress-size+)
-	      (make-object 'store-object))))
-    (test-equal (length (all-store-objects)) +stress-size+)
-    (format t "Delete ~A objects~%" +stress-size+)
-    (time (bknr.datastore::without-sync ()
-	    (map-store-objects #'delete-object)))
-    (test-equal (all-store-objects) nil))
-
+  (time (bknr.datastore::without-sync ()
+          (dotimes (i +stress-size+)
+            (make-object 'store-object))))
+  (test-equal (length (all-store-objects)) +stress-size+)
+  (format t "Delete ~A objects~%" +stress-size+)
+  (time (bknr.datastore::without-sync ()
+          (map-store-objects #'delete-object)))
+  (test-equal (all-store-objects) nil))

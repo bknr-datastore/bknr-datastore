@@ -264,8 +264,8 @@ a snapshot."))
 
 ;;; binary snapshot
 
-(defvar *current-object-slot* nil)
-(defvar *current-slot-relaxed-p* nil)
+(defvar *current-object-slot*)
+(defvar *current-slot-relaxed-p*)
 
 (defun encode-layout (id class slots stream)
   (%write-char #\L stream)
@@ -309,7 +309,7 @@ a snapshot."))
     (%encode-integer (store-object-id object) stream)
     (%encode-set-slots slots object stream)))
 
-(defvar *class-rename-hash* (make-hash-table))
+(defvar *class-rename-hash*)
 
 (defun find-class-with-interactive-renaming (class-name)
   (loop until (find-class class-name nil)
@@ -326,7 +326,7 @@ a snapshot."))
 	do (setq slot-name (read *query-io*))
 	finally (return slot-name)))
 
-(defvar *slot-name-map* nil)
+(defvar *slot-name-map*)
 
 (defun rename-slot (class slot-name)
   (or (caddr (find (list (class-name class) slot-name) *slot-name-map* :key #'(lambda (entry) (subseq entry 0 2)) :test #'equal))
@@ -520,7 +520,9 @@ a snapshot."))
 	(let ((class-layouts (make-hash-table))
 	      (created-objects 0)
 	      (read-slots 0)
-	      (error t))
+	      (error t)
+              (*class-rename-hash* (make-hash-table))
+              (*slot-name-map* nil))
 	  (unwind-protect
 	       (progn
 		 (with-simple-restart

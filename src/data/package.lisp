@@ -9,6 +9,7 @@
   (:shadowing-import-from :cl-interpol quote-meta-chars)
   (:export #:*store-debug*
 	   #:*store*
+           #:with-store
 
 	   ;; session
 	   #:session

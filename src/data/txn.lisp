@@ -19,7 +19,11 @@
 
 ;;; store
 
-(defvar *store* nil)
+(defvar *store*)
+
+(defmacro with-store ((store &key) &body body)
+  `(let ((*store* ,store))
+    ,@body))
 
 (defclass store ()
   ((directory :initarg :directory
@@ -65,26 +69,30 @@
 (defmethod initialize-subsystem ((subsystem t) store store-existed-p)
   (declare (ignore store store-existed-p)))
 
-(defmethod initialize-instance :before ((store store) &key)
-  (restart-case
-      (unless (null *store*)
-	(error "A store is already opened."))
-    (close-store ()
-      :report "Close the opened store."
-      (close-store))))
+(defmethod initialize-instance :before ((store store) &key (make-default t))
+  (when make-default
+    (restart-case
+        (when (and (boundp '*store*)
+                   *store*)
+          (error "A store is already opened."))
+      (close-store ()
+        :report "Close the opened store."
+        (close-store)))))
 
-(defmethod initialize-instance :after ((store store) &key)
+(defmethod initialize-instance :after ((store store) &key (make-default t))
   (when (stringp (store-directory store))
     (setf (store-directory store) (pathname (store-directory store))))
-  (setf *store* store)
-  (let ((store-existed-p (probe-file (store-current-directory store))))
-    (ensure-store-current-directory store)
-    (dolist (subsystem (store-subsystems store))
-      (when *store-debug*
-	(format *trace-output* "Initializing subsystem ~A of ~A~%" subsystem store))
-      (initialize-subsystem subsystem store store-existed-p))
-    (restore-store store))
-  (setf (store-state store) :opened))
+  (when make-default
+    (setf *store* store))
+  (with-store (store)
+    (let ((store-existed-p (probe-file (store-current-directory store))))
+      (ensure-store-current-directory store)
+      (dolist (subsystem (store-subsystems store))
+        (when *store-debug*
+          (format *trace-output* "Initializing subsystem ~A of ~A~%" subsystem store))
+        (initialize-subsystem subsystem store store-existed-p))
+      (restore-store store))
+    (setf (store-state store) :opened)))
 
 (defmethod close-store-object ((store store))
   (close-transaction-log-stream store)
@@ -401,9 +409,8 @@ to the log file in an atomic group"))
   ` (unwind-protect
          (let ((*disable-sync* t))
            ,@body)
-      (let ((store *store*))
-        (with-log-guard ()
-          (fsync (store-transaction-log-stream *store*))))))
+      (with-log-guard ()
+        (fsync (store-transaction-log-stream *store*)))))
 
 ;;; XXX transaction evaluated twice
 (defmacro with-transaction-log ((transaction) &body body)
@@ -508,6 +515,18 @@ transaction, if any."
 (defun snapshot ()
   (snapshot-store *store*))
 
+(defun make-backup-directory (store)
+  "Create directory pathname to place backup for STORE in.  By
+default, the current time stamp is used.  If that directory already
+exists, attach a dot and an incrementing number to the directory
+pathname until a non-existant directory name has been found."
+  (loop with timetag = (timetag)
+        for i = nil then (if i (incf i) 1)
+        for directory = (merge-pathnames (make-pathname :directory (list :relative (format nil "~A~@[.~A~]" timetag i)))
+                                         (store-directory store))
+        unless (probe-file directory)
+        return directory))
+
 (defmethod snapshot-store ((store store))
   (unless (store-open-p)
     (error (make-condition 'store-not-open)))
@@ -517,11 +536,7 @@ transaction, if any."
   (with-store-state (:read-only store)
     (with-store-guard ()
       (with-log-guard ()
-        (let* ((timetag (timetag))
-	       (backup-directory (merge-pathnames (make-pathname :directory `(:relative ,timetag))
-						  (store-directory store))))
-          (when (probe-file backup-directory)
-            (error "Backup of datastore already exists! Snapshotting could lead to data loss, aborting."))
+        (let ((backup-directory (make-backup-directory store)))
           (close-transaction-log-stream store)
 
 	  ;; CMUCL will, dass das directory existiert, ACL nicht

@@ -31,7 +31,7 @@
 (defsystem :bknr.datastore.test  
   :depends-on (:bknr.datastore :fiveam :cl-store :bknr.utils)
   :components ((:module "data" :components ((:file "encoding-test")
-                                            ))))
+                                            (:file "object-tests")))))
 
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (find-system :bknr.datastore))))
   (asdf:oos 'asdf:load-op :bknr.datastore.test)
