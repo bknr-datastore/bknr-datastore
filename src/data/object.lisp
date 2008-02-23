@@ -452,7 +452,8 @@ a snapshot."))
 	     (%encode-integer (store-object-id object) stream))))
 
 (defmethod decode-object ((tag (eql #\o)) stream)
-  (%decode-store-object stream))
+  (let ((*current-object-slot* nil))
+    (%decode-store-object stream)))
 
 (defun %decode-store-object (stream)
   ;; This is actually called in two contexts, when a slot-value is to be filled with a reference to a store object

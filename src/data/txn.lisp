@@ -105,8 +105,6 @@
   (make-instance class-name :directory directory :subsystems subsystems))
 
 (defun close-store ()
-  (when (and (boundp '*store) *store*)
-    (close-object *store*))
   (makunbound '*store*))
 
 (defmacro with-store-guard ((&optional (store '*store*)) &rest body)
@@ -142,7 +140,6 @@
 (defmethod ensure-store-random-state ((store store))
   (if (probe-file (store-random-state-pathname store))
       (with-open-file (f (store-random-state-pathname store))
-	(format t "reading store random state~%")
 	(setf (store-random-state store) (read f)))
       (with-open-file (f (store-random-state-pathname store)
                          :direction :output :if-does-not-exist :create :if-exists :supersede)
@@ -151,7 +148,6 @@
 	  (prin1 (setf (store-random-state store) (make-random-state t)) f)))))
 
 (defmethod update-store-random-state ((store store))
-  (format t "saving store random state~%")
   (with-open-file (f (store-random-state-pathname store)
                      :direction :output :if-does-not-exist :create :if-exists :supersede)
     (with-standard-io-syntax
