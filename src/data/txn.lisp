@@ -105,9 +105,9 @@
   (make-instance class-name :directory directory :subsystems subsystems))
 
 (defun close-store ()
-  (when *store*
-    (close-store-object *store*))
-  (setf *store* nil))
+  (when (and (boundp '*store) *store*)
+    (close-object *store*))
+  (makunbound '*store*))
 
 (defmacro with-store-guard ((&optional (store '*store*)) &rest body)
   "Execute BODY in the context of the guard of STORE."

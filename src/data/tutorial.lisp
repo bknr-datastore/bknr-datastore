@@ -72,7 +72,7 @@
 ;;; directory of BKNR to your `asdf:*central-registry*', and load the
 ;;; indices module by evaluating the following form:
 
-(asdf:oos 'asdf:load-op :bknr-datastore)
+(asdf:oos 'asdf:load-op :bknr.datastore)
 
 ;;; Then switch to the `bknr.datastore' package to try out the tutorial.
 
@@ -133,6 +133,7 @@
 ;;; `TUTORIAL-STORE'. The transaction log will be store in the
 ;;; directory "/tmp/tutorial-store".
 
+(close-store)
 (make-instance 'tutorial-store :directory "/tmp/tutorial-store/"
 	       :subsystems nil)
 ; Warning:  restoring #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
@@ -179,7 +180,7 @@
 ; => #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
 (close-store)
 ; => NIL
-*store*
+(boundp '*store*)
 ; => NIL
 
 ;;; The store can then be recreated, and the transaction log will be
@@ -338,6 +339,7 @@
 ;;; We can create an object datastore by creating a `STORE' with the
 ;;; subsystem `STORE-OBJECT-SUBSYSTEM'.
 
+(close-store)
 (make-instance 'mp-store :directory "/tmp/object-store/"
 	       :subsystems (list
 			    (make-instance 'store-object-subsystem)))
@@ -371,13 +373,13 @@
 ; executing transaction #$(TX-MAKE-OBJECT STORE-OBJECT)
 ; at timestamp 3309260107
 ; => #<STORE-OBJECT ID: 12>
-(store-object-with-id 12)
-; => #<STORE-OBJECT ID: 12>
-(delete-object (store-object-with-id 12))
-; executing transaction #$(TX-DELETE-OBJECT 12)
+(store-object-with-id 2)
+; => #<STORE-OBJECT ID: 2>
+(delete-object (store-object-with-id 2))
+; executing transaction #$(TX-DELETE-OBJECT 2)
 ; at timestamp 3309260112
 ; => T
-(store-object-with-id 12)
+(store-object-with-id 2)
 ; => NIL
 
 ;;;## Defining persistent classes
