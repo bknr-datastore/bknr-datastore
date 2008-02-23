@@ -137,15 +137,28 @@
 (defmethod store-random-state-pathname ((store store))
   (merge-pathnames #P"random-state" (store-current-directory store)))
 
+(defun initialize-store-random-state (store)
+  (with-open-file (f (store-random-state-pathname store)
+                     :direction :output :if-does-not-exist :create :if-exists :supersede)
+    (format t "initializing store random state~%")
+    (with-standard-io-syntax
+      (prin1 (setf (store-random-state store) (make-random-state t)) f))))
+
 (defmethod ensure-store-random-state ((store store))
   (if (probe-file (store-random-state-pathname store))
       (with-open-file (f (store-random-state-pathname store))
-	(setf (store-random-state store) (read f)))
-      (with-open-file (f (store-random-state-pathname store)
-                         :direction :output :if-does-not-exist :create :if-exists :supersede)
-	(format t "initializing store random state~%")
-	(with-standard-io-syntax
-	  (prin1 (setf (store-random-state store) (make-random-state t)) f)))))
+        (restart-case
+            (setf (store-random-state store)
+                  (handler-case
+                      (read f)
+                    (error (e) (error "Invalid store random state"))))
+          (initialize-store-random-state ()
+            :report "Initialize the random state of the store"
+            (initialize-store-random-state store))
+          (ignore-store-random-state ()
+            :report "Ignore the on-disk random state of the store)"
+            (setf (store-random-state store) (make-random-state t)))))
+      (initialize-store-random-state store)))
 
 (defmethod update-store-random-state ((store store))
   (with-open-file (f (store-random-state-pathname store)
