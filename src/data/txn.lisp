@@ -151,12 +151,20 @@
             (setf (store-random-state store)
                   (handler-case
                       (read f)
-                    (error (e) (error "Invalid store random state"))))
+                    (error (e)
+                      (declare (ignore e))
+                      (error "Invalid store random state"))))
           (initialize-store-random-state ()
-            :report "Initialize the random state of the store"
+            :report "Initialize the random state of the store.  Use
+this to reinitialize the random state of the store when porting over a
+store from another compiler. When transactions of the application
+depend on the random state, you must snapshot your store before
+porting to the new compiler."
             (initialize-store-random-state store))
           (ignore-store-random-state ()
-            :report "Ignore the on-disk random state of the store)"
+            :report "Ignore the on-disk random state of the store.
+Use this if you want to test a store with another compiler, but do not
+want to change the store permanently."
             (setf (store-random-state store) (make-random-state t)))))
       (initialize-store-random-state store)))
 

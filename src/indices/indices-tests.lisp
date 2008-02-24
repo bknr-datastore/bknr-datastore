@@ -312,7 +312,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *class-index*
-    (index-create 'class-index :index-subclasses t)))
+    (index-create 'class-index)))
 
 (defclass base-object ()
   ()

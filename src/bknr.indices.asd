@@ -25,3 +25,9 @@
 			 (:file "indices" :depends-on ("package" "protocol"))
 			 (:file "indexed-class" :depends-on ("package" "indices"))
 			 (:file "category-index" :depends-on ("package" "protocol" "indices"))))))
+
+(defsystem :bknr.indices.test  
+  :depends-on (:bknr.indices)
+  :components ((:module "indices"
+                        :components ((:file "indices-tests")))))
+
