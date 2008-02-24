@@ -35,4 +35,4 @@
 
 (defmethod asdf:perform ((op asdf:test-op) (system (eql (find-system :bknr.datastore))))
   (asdf:oos 'asdf:load-op :bknr.datastore.test)
-  (funcall (intern (string :run!) (string :it.bese.FiveAM)) :bknr.datastore))
+  (eval (read-from-string "(it.bese.fiveam:run! :bknr.datastore)")))
