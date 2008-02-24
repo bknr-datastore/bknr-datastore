@@ -12,7 +12,7 @@
   :author "Hans Huebner <hans@huebner.org>"
   :author "Manuel Odendahl <manuel@bl0rg.net>"
   :version "0"
-  :maintainer "Manuel Odendahl <manuel@bl0rg.net>"
+  :maintainer "Hans Huebner <hans@huebner.org>"
   :licence "BSD"
   :description "baikonour - launchpad for lisp satellites"
 

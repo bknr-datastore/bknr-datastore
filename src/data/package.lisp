@@ -9,7 +9,7 @@
   (:shadowing-import-from :cl-interpol quote-meta-chars)
   (:export #:*store-debug*
 	   #:*store*
-           #:with-store
+           #+(or) #:with-store          ; currently not exported, does not work with indices
 
 	   ;; session
 	   #:session
