@@ -17,8 +17,8 @@
 
 (defun congruent-p (a b)
   "Are lisp value A and B (deeply) congruent?"
-  (bknr.utils:with-temp-file (path-a)
-    (bknr.utils:with-temp-file (path-b)
+  (bknr.utils:with-temporary-file (path-a)
+    (bknr.utils:with-temporary-file (path-b)
       (cl-store:store a path-a)
       (cl-store:store b path-b)
       (prog1
@@ -27,7 +27,7 @@
         (delete-file path-b)))))
 
 (defun copy-by-encoding (value)
-  (bknr.utils:with-temp-file (path)
+  (bknr.utils:with-temporary-file (path)
     (with-open-file (out path :direction :output :if-exists :supersede
                          :element-type '(unsigned-byte 8))
       (encode value out))

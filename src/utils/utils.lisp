@@ -199,7 +199,7 @@
 				(read-chunks))))))
       (read-chunks))))
 
-(defun temporary-file (&key (defaults nil) (name "tmp"))
+(defun make-temporary-pathname (&key (defaults nil) (name "tmp"))
   (loop for file = (make-pathname :name (format nil "~A-~A-~A"
 						name
                                                 (get-universal-time)
@@ -208,8 +208,8 @@
         while (probe-file file)
         finally (return file)))
 
-(defmacro with-temp-file ((var &rest args) &body body)
-  `(let ((,var (temporary-file ,@args)))
+(defmacro with-temporary-file ((var &rest args) &body body)
+  `(let ((,var (make-temporary-pathname ,@args)))
      (unwind-protect
 	  (progn ,@body)
        (when (probe-file ,var)

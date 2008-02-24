@@ -41,8 +41,8 @@
            #:move-file
            #:directory-empty-p
            #:subdir-p
-           #:temporary-file
-           #:with-temp-file
+           #:make-temporary-pathname
+           #:with-temporary-file
            #:file-contents
            #:parent-directory
    
