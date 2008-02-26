@@ -324,13 +324,14 @@
   (let* ((n (%decode-integer stream))
          (s (make-array n)))
     (excl::stream-read-sequence stream s)
-    #+nil(map 'string #'code-char s)
-    #-nil(coerce s 'string)))
+    #+nil (map 'string #'code-char s)
+    #-nil (coerce s 'string)))
 
 (defun %decode-symbol (stream)
   (let ((p (%decode-string stream))
         (n (%decode-string stream)))
-    (intern n (find-package p))))
+    (intern n (or (find-package p)
+                  (error "package ~A for symbol ~A not found" p n)))))
 
 (defun %decode-list (stream)
   (let* ((n (%decode-integer stream))
