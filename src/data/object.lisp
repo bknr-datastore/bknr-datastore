@@ -531,7 +531,7 @@ a snapshot."))
 		   (loop
 		    (when (and (plusp created-objects)
 			       (zerop (mod created-objects 10000)))
-		      #+nil(format t "Snapshot position ~A~%" (file-position s))
+		      #+nil (format t "Snapshot position ~A~%" (file-position s))
 		      (format t "~A objects created.~%" created-objects)
 		      (force-output))
 		    (when (and (plusp read-slots)
