@@ -141,4 +141,7 @@
            #:class-subclasses
 
            ;; norvig
-           #:find-all))
+           #:find-all
+
+           ;; misc
+           #:subseq*))

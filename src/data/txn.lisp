@@ -403,11 +403,11 @@ to the log file in an atomic group"))
 
 (defmethod execute-unlogged ((transaction transaction))
   (with-store-guard ()
-    (let* ((function (or (symbol-function (transaction-function-symbol transaction))
-			 (error "Undefined transaction function ~A, please ensure that all the necessary code is loaded."
-				(transaction-function-symbol transaction))))
-	   (*current-transaction* transaction))
-      (apply function (transaction-args transaction)))))
+    (let ((*current-transaction* transaction))
+      (apply (or (symbol-function (transaction-function-symbol transaction))
+                 (error "Undefined transaction function ~A, please ensure that all the necessary code is loaded."
+                        (transaction-function-symbol transaction)))
+             (transaction-args transaction)))))
 
 (defun fsync (stream)
   ;; FINISH-OUTPUT macht leider auch nichts anderes als FORCE-OUTPUT,

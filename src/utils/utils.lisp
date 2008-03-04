@@ -543,3 +543,7 @@ it is assumed that the string specifies the MIME type."
     (t
      (format nil "~A" byte-count))))
 
+(defun subseq* (sequence start &optional end)
+  "Like SUBSEQ, but limit END to the length of SEQUENCE"
+  (subseq sequence start (when end
+                           (min end (length sequence)))))

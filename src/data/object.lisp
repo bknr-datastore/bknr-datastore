@@ -89,8 +89,9 @@ deleted, slot reads will return nil."
 
 (defmethod (setf slot-value-using-class) :after (newval (class persistent-class) object slotd)
   (when (in-anonymous-transaction-p)
-    (push (make-instance 'transaction :timestamp (get-universal-time)
-			 :function-symbol 'change-slot-values
+    (push (make-instance 'transaction
+                         :timestamp (get-universal-time)
+			 :function-symbol 'tx-change-slot-values
 			 :args (list object (slot-definition-name slotd) newval))
 	  (anonymous-transaction-transactions *current-transaction*))))
 
@@ -264,8 +265,8 @@ a snapshot."))
 
 ;;; binary snapshot
 
-(defvar *current-object-slot*)
-(defvar *current-slot-relaxed-p*)
+(defvar *current-object-slot* nil)
+(defvar *current-slot-relaxed-p* nil)
 
 (defun encode-layout (id class slots stream)
   (%write-char #\L stream)
