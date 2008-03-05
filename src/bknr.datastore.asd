@@ -18,6 +18,7 @@
 
   :depends-on (:cl-interpol
                :closer-mop
+               :alexandria
                :unit-test
                :bknr.utils
                :bknr.indices)
