@@ -634,7 +634,7 @@ the result of calling CASCADE-DELETE-P.  Generate error if there are references 
 to cascading deletes."
   (multiple-value-bind (cascading-delete-refs
 			remaining-refs)
-      (partition-list (find-refs object) #'cascade-delete-p)
+      (partition-list (find-refs object) (alexandria:curry #'cascade-delete-p object))
     (when remaining-refs
       (error "Cannot delete object ~A because there are references to this object in the system, please consult a system administrator!"
 	     object))
@@ -696,7 +696,7 @@ to cascading deletes."
 		(and (slot-boundp candidate (slot-definition-name slotd))
 		     (let ((slot-value (slot-value candidate (slot-definition-name slotd))))
 		       (or (eq object slot-value)
-			   (and (listp slot-value)
+			   (and (alexandria:proper-list-p slot-value)
 				(find object slot-value))))))
 	      (class-slots (class-of candidate))))
    (class-instances 'store-object)))
