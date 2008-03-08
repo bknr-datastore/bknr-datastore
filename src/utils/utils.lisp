@@ -25,7 +25,7 @@
     (let ((s (if stream stream (make-string-output-stream))))
       (cond
 	(mail-style
-	 (format s "~A, ~2D ~A ~4D ~2,'0D:~2,'0D:~2,'0D ~A"
+	 (format s "~A, ~2,'0D ~A ~4D ~2,'0D:~2,'0D:~2,'0D ~A"
 		 (elt #("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun") weekday)
 		 day (elt #("Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec") (1- month)) year
 		 hour min sec *mail-timezone*))
