@@ -638,6 +638,7 @@ to cascading deletes."
     (apply #'delete-objects object cascading-delete-refs)))
 
 (deftransaction change-slot-values (object &rest slots-and-values)
+  (warn "CHANGE-SLOT-VALUES is deprecated - use WITH-TRANSACTION and standard accessors!")
   (when object
     (loop for (slot value) on slots-and-values by #'cddr
           do (setf (slot-value object slot) value))))
