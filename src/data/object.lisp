@@ -244,7 +244,7 @@ a snapshot."))
       (error "Can not define a persistent class with metaclass ~A." metaclass))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (defclass ,class ,superclasses ,slots
-	 ,@(unless metaclass '(:metaclass persistent-class))
+	 ,@(unless metaclass '((:metaclass persistent-class)))
 	 ,@class-options))))
 
 #+nil
