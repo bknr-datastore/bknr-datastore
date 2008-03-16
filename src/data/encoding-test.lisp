@@ -61,12 +61,12 @@
 (test-encoding integer.5 most-positive-fixnum)
 (test-encoding integer.6 most-negative-fixnum)
 
-;; ratios - currently no supported
-;; (test-encoding ratio.1 1/2)
-;; (test-encoding ratio.2 234232/23434)
-;; (test-encoding ratio.3 -12/2)
-;; (test-encoding ratio.4 -6/11)
-;; (test-encoding ratio.5 23222/13)
+;; ratios
+(test-encoding ratio.1 1/2)
+(test-encoding ratio.2 234232/23434)
+(test-encoding ratio.3 -12/2)
+(test-encoding ratio.4 -6/11)
+(test-encoding ratio.5 23222/13)
 
 ;; complex numbers - currently not supported
 ;; (test-encoding complex.1 #C(0 1))

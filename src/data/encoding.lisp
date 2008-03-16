@@ -144,9 +144,17 @@
         for i from (- (* n 8) 8) downto 0 by 8
         do (write-byte (ldb (byte 8 i) object) stream))))
 
+(defun %encode-rational (object stream)
+  (%encode-integer (numerator object) stream)
+  (%encode-integer (denominator object) stream))
+
 (defun encode-integer (object stream)
   (%write-char #\i stream)
   (%encode-integer object stream))
+
+(defun encode-rational (object stream)
+  (%write-char #\r stream)
+  (%encode-rational object stream))
 
 (defun count-conses (list)
   ;; Vorsicht, CMUCL LOOP hat einen Bug mit dotted lists.
@@ -267,6 +275,7 @@
 (defun encode (object stream)
   (typecase object
     (integer (encode-integer object stream))
+    (rational (encode-rational object stream))
     (symbol (encode-symbol object stream))
     (character (encode-char object stream))
     (string (encode-string object stream))
@@ -306,6 +315,10 @@
   (let ((n (read-byte stream)))
     (assert (plusp n))                  ;n==0 geben wir nicht aus
     (%decode-integer/fixed stream n)))
+
+(defun %decode-rational (stream)
+  (/ (%decode-integer stream)
+     (%decode-integer stream)))
 
 (defun %decode-char (stream)
   (%read-char stream))
@@ -411,6 +424,7 @@
       (#\# (%decode-hash-table stream))
       (#\f (%decode-single-float stream))
       (#\d (%decode-double-float stream))
+      (#\r (%decode-rational stream))
       (t (decode-object tag stream)))))
 
 (defgeneric decode-object (tag stream))
