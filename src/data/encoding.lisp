@@ -1,80 +1,77 @@
-;;;; Schreiben und Lesen von Lisp-Objekten in einem Binaerformat.
+;;;; Reading and writing Lisp objects in a binary format.
 
 ;;; Design:
 ;;;
-;;;   - relativ kompakter Output
-;;;
-;;;   - keine willkuerlichen Beschraenkungen
-;;;     Integers duerfen z.B. beliebig gross sein.
-;;;
-;;;   - Aber generell Performance vor Features
-;;;     Insbesondere wird nicht auf Zyklen geprueft!
+;;;   - compact storage requirements
+;;;   - no arbitary limits (e.g. integers may be arbitarily large)
+;;;   - high read and write performance, thus no checking for cyclic data
 
-;;; Fuer jeden unterstuetzten Datentyp ist ein Buchstabe als Tag definiert,
-;;; am dem beim Lesen den Typ wieder erkannt werden kann.
+;;; For every supported data type, a character is defined as tag denoting
+;;; the type when reading.
 ;;;
-;;; Mittels der Funktionen ENCODE und DECODE kann ein beliebiges Objekt
-;;; geschrieben bzw. gelesen werden.  Sie werten automatisch den Datentype
-;;; (beim Schreiben) bzw. das Tag (beim Lesen) aus.
+;;; The functions ENCODE and DECODE encode and decode an arbitary object.
+;;; Upon write, ENCODE determines the data type from the lisp data type.
+;;; Upon read, DECODE determines the data type of the object by looking at
+;;; the tag character.
 ;;;
-;;; Ist der Datentyp ohnehin bekannt, koennen die entsprechenden Funktionen
-;;; auch direkt aufgerufen werden.  Z.B. schreibt ENCODE-INTEGER ein Integer.
+;;; If the data type is known upfron, the respective coder function can be
+;;; called directly.  ENCODE-INTEGER encodes an integer, for example.
 ;;;
-;;; Ist an der entsprechenden Stelle im File ueberhaupt nur ein Integer
-;;; sinnvoll, kann zusaetzlich auch noch das Tag entfallen.  Dazu gibt es
-;;; im Allgemeinen eine low-level Funktion, z.B. %ENCODE-INTEGER, die nur
-;;; die eigentlichen Daten ohne Tag schreibt, und eine zugehoerige Funktion
-;;; DECODE-INTEGER, die solche Daten liest.
+;;; At certain file positions, only one datatype makes sense (i.e. when
+;;; writing a structure with a fixed layout).  In this case, the tag need
+;;; not be written.  For this purpose, a low-level function, i.e.
+;;; %ENCODE-INTEGER, exists to write the object without writing a tag,
+;;; and a matching decode function DECODE-INTEGER to read such untagged
+;;; data.
 
 ;;; Format:
 
-;;;     Feld    Format     Kommentar
+;;;    Field    Format     Comment
 ;;; ----------------------------------------------------------------
 ;;; Integer
 ;;;     tag     #\i
-;;;     n       byte       Laenge der folgenden Bytesequenz
-;;;     data    byte[n]    Die eigentlich Zahl, Big Endian
+;;;     n       byte       Number of bytes that follow
+;;;     data    byte[n]    The actual data, a big endian number
 ;;; ----------------------------------------------------------------
-;;; Referenz auf Store-Object
+;;; Reference to a STORE-OBJECT
 ;;;     tag     #\o
-;;;     ID      %integer   Die ID des bezeichneten Objektes
+;;;     ID      %integer   ID of the referenced object
 ;;;
 ;;; ----------------------------------------------------------------
-;;; Liste
+;;; List
 ;;;     tag     #\l
-;;;     n       %integer   Anzahl der folgenden Objekte
-;;;     data    object[n]  Objekte mit Tag
-;;;     tail    object     Falls n != 0: CDR des letzten Conses
+;;;     n       %integer   Number of bytes that follow
+;;;     data    object[n]  Objects including tag
+;;;     tail    object     If n != 0: CDR of the last cons
 ;;;
 ;;; ----------------------------------------------------------------
 ;;; Char
 ;;;     tag     #\c
-;;;     data    char       Zeichen, mit WRITE-CHAR geschrieben
+;;;     data    char       Character, written with WRITE-CHAR
 ;;; ----------------------------------------------------------------
 ;;; String
 ;;;     tag     #\s
-;;;     n       %integer   Anzahl der folgenden Zeichen
-;;;     data    char[n]    Zeichen wie von WRITE-CHAR geschrieben (!)
-;;; (Das exakte Format haengte also vom External-Format des Streams ab.
-;;; Es kann sich um Latin-1, UTF-8, UTF-16 oder was-auch-immer handeln.)
+;;;     n       %integer   Number of bytes that follow
+;;;     data    char[n]    Characters, written with WRITE-CHAR
+;;; Note that the layout of strings will change to not use WRITE-CHAR
 ;;;
 ;;; ----------------------------------------------------------------
 ;;; Symbol
 ;;;     tag     #\y
-;;;     package %string    Name des Home-Pakets des Symbols
-;;;     name    %string    Name des Symbols
+;;;     package %string    Name of the home package of the symbol
+;;;     name    %string    Name of the symbol
 ;;;
 ;;; ----------------------------------------------------------------
 ;;; Hash-Table
 ;;;     tag     #\#
 ;;;     test    %symbol    hash-table-test-function
 ;;;     r.-size %double    hash-table-rehash-size
-;;;     n       %integer   Anzahl der folgenden Wertepaare
-;;;     data    pair[n]    Wertepaare im folgenden Format:
+;;;     n       %integer   Number of value pairs that follow
+;;;     data    pair[n]    Value pairs in the following format
 ;;;
 ;;;   pair:
-;;;     key     object     Objekt mit Tag
-;;;     value   object     Objekt mit Tag
+;;;     key     object     Objekt with tag
+;;;     value   object     Objekt with tag
 ;;;
 ;;; ----------------------------------------------------------------
 ;;; Single-Float
@@ -97,9 +94,9 @@
 ;;;               other bits reserved
 ;;;
 ;;;   if (flags has bit 0 set) {
-;;;     length  %integer          Laenge des Vektors
+;;;     length  %integer          Length of fector
 ;;;   } else {
-;;;     n       %integer          Anzahl der folgenden Dimensionen
+;;;     n       %integer          Number of dimensions following
 ;;;     dims    %integer[n]       ARRAY-DIMENSIONS
 ;;;   } 
 ;;;
@@ -107,7 +104,7 @@
 ;;;     fp      %integer          fill-pointer
 ;;;   }
 ;;;
-;;;     data    object[\Pi dims]  Daten in row-major-order
+;;;     data    object[\Pi dims]  Data in row-major-order
 ;;;
 ;;; ----------------------------------------------------------------
 
