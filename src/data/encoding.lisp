@@ -32,6 +32,15 @@
 ;;;     tag     #\i
 ;;;     n       byte       Number of bytes that follow
 ;;;     data    byte[n]    The actual data, a big endian number
+;;;
+;;; ----------------------------------------------------------------
+;;; Rational
+;;;     tag     #\r
+;;;     n       byte       Number of bytes that follow
+;;;     data    byte[n]    The numerator, a big endian number
+;;;     n       byte       Number of bytes that follow
+;;;     data    byte[n]    The denominator, a big endian number
+;;;
 ;;; ----------------------------------------------------------------
 ;;; Reference to a STORE-OBJECT
 ;;;     tag     #\o
