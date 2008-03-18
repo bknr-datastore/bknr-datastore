@@ -169,7 +169,7 @@ datastore root to ensure that the correct value is used later.")))
       (write (n-blobs-per-directory subsystem) :stream s))))
 
 (defun delete-orphaned-blob-files (&optional (cold-run t))
-  (dolist (blob-pathname (directory (merge-pathnames (make-pathname :directory '(:relative :wild-inferiors))
+  (dolist (blob-pathname (directory (merge-pathnames (make-pathname :name :wild :directory '(:relative :wild-inferiors))
 						     (store-blob-root-pathname))))
     (handler-case
 	(when (pathname-name blob-pathname)
