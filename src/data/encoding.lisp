@@ -192,11 +192,11 @@
   (%write-char object stream))
 
 (defun %encode-string (object stream)
-  (%encode-integer (length object) stream)
-  #+allegro
-  (excl::stream-write-sequence stream object)
-  #-allegro
-  (%write-string object stream))
+  (labels ((string-to-octets (string)
+             (flexi-streams:string-to-octets string :external-format #.(flexi-streams:make-external-format :utf-8))))
+    (let ((octets (string-to-octets object)))
+      (%encode-integer (length octets) stream)
+      (write-sequence octets stream))))
 
 (defun encode-string (object stream)
   (%write-char #\s stream)
