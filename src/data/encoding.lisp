@@ -192,8 +192,11 @@
   (%write-char object stream))
 
 (defun %encode-string (object stream)
-  (labels ((string-to-octets (string)
-             (flexi-streams:string-to-octets string :external-format #.(flexi-streams:make-external-format :utf-8))))
+  (labels ((string-to-octets-portably (string)
+             (flexi-streams:string-to-octets string :external-format #.(flexi-streams:make-external-format :utf-8)))
+           (string-to-octets (string)
+             #+sbcl(sb-ext:string-to-octets string :external-format :utf-8)
+             #-sbcl(string-to-octets-portably string)))
     (let ((octets (string-to-octets object)))
       (%encode-integer (length octets) stream)
       (write-sequence octets stream))))
