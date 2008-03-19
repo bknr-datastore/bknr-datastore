@@ -157,7 +157,7 @@
 (test-encoding array.4
                (make-array  '(2 3 5)
                             :initial-contents
-                            '(((1 2 #\f 5 12.0) (#\Space "fpp" 4 1 0) ('d "foo" #() 3 -1))
+                            '(((1 2 #\f 5 12.0) (#\Space 0 4 1 0) ('d 0 #() 3 -1))
                               ((0 #\a #\b 4 #\q) (12.0d0 0 '(d) 4 1)
                                (#\Newline 1 7 #\4 #\0)))))
 
