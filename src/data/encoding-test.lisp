@@ -107,11 +107,16 @@ bar")
                (make-array 10 :initial-element #\f :element-type 'character
                            :fill-pointer 3))
 
+(test:test string.random
+  (test:for-all ((string (test:gen-string)))
+    (test:is (congruent-p string (copy-by-encoding string)))))
+
 (test:test string.decode-utf-8
   (labels ((decode-string-from-octets (octets)
              (flexi-streams:with-input-from-sequence (in octets)
                (bknr.datastore::%decode-string in))))    
     (test:is (string-equal "<=>" (decode-string-from-octets #(1 3 60 61 62))))
+    ;; #\? is the substitution char
     (test:is (string-equal "<?>" (decode-string-from-octets #(1 3 60 188 62))))
     (test:for-all ((octets (test:gen-buffer)))
       (test:finishes (decode-string-from-octets (concatenate 'vector (vector 1 (length octets)) octets))))))
