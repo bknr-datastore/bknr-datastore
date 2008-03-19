@@ -97,19 +97,10 @@
 (test-encoding char.3 #\Rubout)
 (test-encoding char.4 (code-char 255))
 
-;; various strings
-(test-encoding string.1 "foobar")
-(test-encoding string.2 "how are you")
-(test-encoding string.3 "foo
-bar")
-
-(test-encoding (string.4 :skip "will be fixed later - http://trac.common-lisp.net/bknr/ticket/30")
-               (make-array 10 :initial-element #\f :element-type 'character
-                           :fill-pointer 3))
-
+;; strings
 (test:test string.random
   (test:for-all ((string (test:gen-string)))
-    (test:is (congruent-p string (copy-by-encoding string)))))
+    (test:is (string= string (copy-by-encoding string)))))
 
 (test:test string.decode-utf-8
   (labels ((decode-string-from-octets (octets)
