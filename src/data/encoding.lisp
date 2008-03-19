@@ -333,18 +333,19 @@
   (%read-char stream))
 
 (defun %decode-string (stream)
-  #-allegro
-  (let* ((n (%decode-integer stream))
-         (s (make-string n)))
-    (dotimes (i n)
-      (setf (char s i) (%read-char stream)))
-    s)
-  #+allegro
-  (let* ((n (%decode-integer stream))
-         (s (make-array n)))
-    (excl::stream-read-sequence stream s)
-    #+nil (map 'string #'code-char s)
-    #-nil (coerce s 'string)))
+  (labels ((octets-to-string-safe (octets) ; and portable
+             (let ((flexi-streams:*substitution-char* #\?))
+               (flexi-streams:octets-to-string octets :external-format #.(flexi-streams:make-external-format :utf-8))))
+           (octets-to-string (octets)
+             #+sbcl (handler-case
+                        #+sbcl(sb-ext:octets-to-string octets :external-format :utf-8)
+                        (#+sbcl sb-impl::octet-decoding-error ()
+                                (octets-to-string-safe octets)))
+             #-sbcl (octets-to-string-safe octets)))
+    (let* ((n (%decode-integer stream))
+           (buffer (make-array n :element-type '(unsigned-byte 8))))    
+      (assert (= n (read-sequence buffer stream)))
+      (octets-to-string buffer))))
 
 (defun %decode-symbol (stream)
   (let ((p (%decode-string stream))
