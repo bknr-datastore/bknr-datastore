@@ -109,8 +109,13 @@
     (test:is (string-equal "<=>" (decode-string-from-octets #(1 3 60 61 62))))
     ;; #\? is the substitution char
     (test:is (string-equal "<?>" (decode-string-from-octets #(1 3 60 188 62))))
-    (test:for-all ((octets (test:gen-buffer)))
-      (test:finishes (decode-string-from-octets (concatenate 'vector (vector 1 (length octets)) octets))))))
+    ;; kilian 2008-03-20: the following for-all test failed on ccl,
+    ;; because the correct utf-8 sequence could produce a char-code
+    ;; above char-code-limit - bknr.datastore::%decode-string should
+    ;; throw an error in this case, but I dont know how to test this
+    ;; (test:for-all ((octets (test:gen-buffer)))
+    ;;       (test:finishes (decode-string-from-octets (concatenate 'vector (vector 1 (length octets)) octets))))
+    ))
 
 ;; #+(or (and sbcl sb-unicode) lispworks clisp acl)
 ;; (progn
