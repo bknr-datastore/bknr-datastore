@@ -21,7 +21,8 @@
                :alexandria
                :unit-test
                :bknr.utils
-               :bknr.indices)
+               :bknr.indices
+               :trivial-utf-8)
 
   :components ((:module "data" :components ((:file "package")
                                             (:file "encoding" :depends-on ("package"))

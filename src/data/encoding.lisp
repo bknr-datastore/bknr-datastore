@@ -150,8 +150,8 @@
   (let ((n (ceiling (1+ (integer-length object)) 8)))
     (write-byte n stream)
     (loop
-        for i from (- (* n 8) 8) downto 0 by 8
-        do (write-byte (ldb (byte 8 i) object) stream))))
+       for i from (- (* n 8) 8) downto 0 by 8
+       do (write-byte (ldb (byte 8 i) object) stream))))
 
 (defun %encode-rational (object stream)
   (%encode-integer (numerator object) stream)
@@ -169,19 +169,19 @@
   ;; Vorsicht, CMUCL LOOP hat einen Bug mit dotted lists.
   ;; Daher nicht FOR-ON verwenden.
   (loop for l = list then (cdr l)
-        while (consp l)
-        count 1))
+     while (consp l)
+     count 1))
 
 (defun %encode-list (object stream)
   (let ((len (count-conses object)))
     (%encode-integer len stream)
-  ;; Vorsicht, CMUCL LOOP hat einen Bug mit dotted lists.
-  ;; Daher nicht FOR-ON verwenden.
+    ;; Vorsicht, CMUCL LOOP hat einen Bug mit dotted lists.
+    ;; Daher nicht FOR-ON verwenden.
     (when (> len 0)
       (loop for l = object then (cdr l)
-	    while (consp l)
-	    do (encode (car l) stream)
-	    finally (encode l stream)))))
+         while (consp l)
+         do (encode (car l) stream)
+         finally (encode l stream)))))
 
 (defun encode-list (object stream)
   (%write-char #\l stream)
@@ -192,12 +192,9 @@
   (%write-char object stream))
 
 (defun %encode-string (object stream)
-  (labels ((string-to-octets (string)
-             #+sbcl(sb-ext:string-to-octets string :external-format :utf-8)
-             #-sbcl(flexi-streams:string-to-octets string :external-format #.(flexi-streams:make-external-format :utf-8))))
-    (let ((octets (string-to-octets object)))
-      (%encode-integer (length octets) stream)
-      (write-sequence octets stream))))
+  (let ((octets (trivial-utf-8:string-to-utf-8-bytes object)))
+    (%encode-integer (length octets) stream)
+    (write-sequence octets stream)))
 
 (defun encode-string (object stream)
   (%write-char #\s stream)
@@ -334,15 +331,14 @@
   (%read-char stream))
 
 (defun %decode-string (stream)
-  (labels ((octets-to-string-safe (octets) ; and portable
+  (labels ((octets-to-string-safe (octets) ; safe and portable
              (let ((flexi-streams:*substitution-char* #\?))
                (flexi-streams:octets-to-string octets :external-format #.(flexi-streams:make-external-format :utf-8))))
            (octets-to-string (octets)
-             #+sbcl (handler-case
-                        #+sbcl(sb-ext:octets-to-string octets :external-format :utf-8)
-                        (#+sbcl sb-impl::octet-decoding-error ()
-                                (octets-to-string-safe octets)))
-             #-sbcl (octets-to-string-safe octets)))
+             (handler-case
+                 (trivial-utf-8:utf-8-bytes-to-string octets)
+               (trivial-utf-8:utf-8-decoding-error ()                   
+                 (octets-to-string-safe octets)))))
     (let* ((n (%decode-integer stream))
            (buffer (make-array n :element-type '(unsigned-byte 8))))    
       (assert (= n (read-sequence buffer stream)))
@@ -410,7 +406,7 @@
           (if vectorp
               (list (%decode-integer stream))
               (loop repeat (%decode-integer stream)
-                    collect (%decode-integer stream))))
+                 collect (%decode-integer stream))))
          (fill-pointer
           (if fill-pointer-p
               (%decode-integer stream)
@@ -450,7 +446,7 @@
                       (0  1.0)
                       (1 -1.0)))
               (iexpt (ldb (byte 8 23) bits))
-              (expt (if (zerop iexpt) ; denormalized
+              (expt (if (zerop iexpt)   ; denormalized
                         -126
                         (- iexpt 127)))
               (mant (* (logior (ldb (byte 23 0) bits)
@@ -471,7 +467,7 @@
 		      (0  1.0d0)
 		      (1 -1.0d0)))
               (iexpt (ldb (byte 11 52) bits))
-	      (expt (if (zerop iexpt) ; denormalized
+	      (expt (if (zerop iexpt)   ; denormalized
                         -1022
                         (- iexpt 1023)))
 	      (mant (* (logior (ldb (byte 52 0) bits)

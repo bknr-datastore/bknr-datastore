@@ -102,6 +102,10 @@
   (test:for-all ((string (test:gen-string)))
     (test:is (string= string (copy-by-encoding string)))))
 
+(test:test string.random.code-limited
+  (test:for-all ((string (test:gen-string :elements (test:gen-character :code-limit 10000))))
+    (test:is (string= string (copy-by-encoding string)))))
+
 (test:test string.decode-utf-8
   (labels ((decode-string-from-octets (octets)
              (flexi-streams:with-input-from-sequence (in octets)
