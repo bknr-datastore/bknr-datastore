@@ -97,6 +97,10 @@
 (test-encoding char.3 #\Rubout)
 (test-encoding char.4 (code-char 255))
 
+(test:test char.random
+  (test:for-all ((char (test:gen-character)))
+    (test:is (char= char (copy-by-encoding char)))))
+
 ;; strings
 (test:test string.random
   (test:for-all ((string (test:gen-string)))

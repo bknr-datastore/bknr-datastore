@@ -121,18 +121,20 @@
 
 ;;;; workaround
 
-(defun %read-char (stream &optional (eof-error-p t) eof-value)
-  (let ((b (read-byte stream eof-error-p -1)))
-    (if (eql b -1)
-        eof-value
-        (code-char b))))
+(declaim (inline %read-char %write-char))
+(defun %read-char (stream)  
+  (code-char (%decode-uint32 stream)))
 
 (defun %write-char (char stream)
-  (write-byte (char-code char) stream))
+  (%encode-int32 (char-code char) stream))
 
-(defun %write-string (string stream)
-  (dotimes (i (length string))
-    (%write-char (char string i) stream)))
+;;;; tags
+(declaim (inline %read-tag %write-tag))
+(defun %read-tag (stream)  
+  (code-char (read-byte stream)))
+
+(defun %write-tag (char stream)
+  (write-byte (char-code char) stream))
 
 ;;;; binary encoding
 
@@ -158,11 +160,11 @@
   (%encode-integer (denominator object) stream))
 
 (defun encode-integer (object stream)
-  (%write-char #\i stream)
+  (%write-tag #\i stream)
   (%encode-integer object stream))
 
 (defun encode-rational (object stream)
-  (%write-char #\r stream)
+  (%write-tag #\r stream)
   (%encode-rational object stream))
 
 (defun count-conses (list)
@@ -184,11 +186,11 @@
          finally (encode l stream)))))
 
 (defun encode-list (object stream)
-  (%write-char #\l stream)
+  (%write-tag #\l stream)
   (%encode-list object stream))
 
 (defun encode-char (object stream)
-  (%write-char #\c stream)
+  (%write-tag #\c stream)
   (%write-char object stream))
 
 (defun %encode-string (object stream)
@@ -197,7 +199,7 @@
     (write-sequence octets stream)))
 
 (defun encode-string (object stream)
-  (%write-char #\s stream)
+  (%write-tag #\s stream)
   (%encode-string object stream))
 
 (defun %encode-symbol (object stream)
@@ -205,11 +207,11 @@
   (%encode-string (symbol-name object) stream))
 
 (defun encode-symbol (object stream)
-  (%write-char #\y stream)
+  (%write-tag #\y stream)
   (%encode-symbol object stream))
 
 (defun encode-hash-table (object stream)
-  (%write-char #\# stream)
+  (%write-tag #\# stream)
   (%encode-symbol (hash-table-test object) stream)
   (%encode-double-float (float (hash-table-rehash-size object) 1.0d0) stream)
   (%encode-integer (hash-table-count object) stream)
@@ -231,7 +233,7 @@
   (%encode-int32 (sb-kernel:single-float-bits object) stream))
 
 (defun encode-single-float (object stream)
-  (%write-char #\f stream)
+  (%write-tag #\f stream)
   (%encode-single-float object stream))
 
 (defun %encode-double-float (object stream)
@@ -251,7 +253,7 @@
 	 (%encode-int32 (sb-kernel:double-float-low-bits object) stream)))
 
 (defun encode-double-float (object stream)
-  (%write-char #\d stream)
+  (%write-tag #\d stream)
   (%encode-double-float object stream))
 
 (defun %encode-array (object stream)
@@ -276,7 +278,7 @@
       (encode (row-major-aref object i) stream))))
 
 (defun encode-array (object stream)
-  (%write-char #\a stream)
+  (%write-tag #\a stream)
   (%encode-array object stream))
 
 (defun encode (object stream)
@@ -420,7 +422,7 @@
     result))
 
 (defun decode (stream)
-  (let ((tag (%read-char stream)))
+  (let ((tag (%read-tag stream)))
     (case tag
       (#\a (%decode-array stream))
       (#\i (%decode-integer stream))
