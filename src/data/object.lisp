@@ -269,7 +269,7 @@ a snapshot."))
 (defvar *current-slot-relaxed-p* nil)
 
 (defun encode-layout (id class slots stream)
-  (%write-char #\L stream)
+  (%write-tag #\L stream)
   (%encode-integer id stream)
   (%encode-symbol (class-name class) stream)
   (%encode-integer (length slots) stream)
@@ -298,14 +298,14 @@ a snapshot."))
       (setf (gethash class class-layouts) layout))
     (destructuring-bind (layout-id &rest slots) layout
       (declare (ignore slots))
-      (%write-char #\O stream)
+      (%write-tag #\O stream)
       (%encode-integer layout-id stream)
       (%encode-integer (store-object-id object) stream))))
 
 (defun encode-set-slots (class-layouts object stream)
   (destructuring-bind (layout-id &rest slots)
       (gethash (class-of object) class-layouts)
-    (%write-char #\S stream)
+    (%write-tag #\S stream)
     (%encode-integer layout-id stream)
     (%encode-integer (store-object-id object) stream)
     (%encode-set-slots slots object stream)))
@@ -430,7 +430,7 @@ a snapshot."))
 	;;; wrong with the indices
 	(unless (and container slot)
 	  (warn "Encoding destroyed object with ID ~A." id)
-	  (%write-char #\o stream)
+	  (%write-tag #\o stream)
 	  (%encode-integer id stream)
 	  (return-from encode-object))
 
@@ -439,14 +439,14 @@ a snapshot."))
 	    (progn
 	      (warn "Encoding reference to destroyed object with ID ~A from slot ~A of object ~A with ID ~A."
 		    id slot (type-of container) (store-object-id container))
-	      (%write-char #\o stream)
+	      (%write-tag #\o stream)
 	      (%encode-integer id stream))
 	    ;;; the slot can't contain references to deleted objects, throw an error
 	    (error "Encoding reference to destroyed object with ID ~A from slot ~A of object ~A with ID ~A."
 		   id slot (type-of container) (store-object-id container))))
 
       ;;; Go ahead and serialize the object reference
-      (progn (%write-char #\o stream)
+      (progn (%write-tag #\o stream)
 	     (%encode-integer (store-object-id object) stream))))
 
 (defmethod decode-object ((tag (eql #\o)) stream)
@@ -536,7 +536,7 @@ a snapshot."))
 			       (zerop (mod read-slots 10000)))
 		      (format t "~A of ~A objects initialized.~%" read-slots created-objects)
 		      (force-output))
-		    (let ((char (%read-char s nil nil)))
+		    (let ((char (%read-tag s nil nil)))
 		      (unless (member char '(#\O #\L #\S nil))
 			(format t "unknown char ~A at offset ~A~%" char (file-position s)))
 		      (ecase char

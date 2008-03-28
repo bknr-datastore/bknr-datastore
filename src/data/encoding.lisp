@@ -130,8 +130,11 @@
 
 ;;;; tags
 (declaim (inline %read-tag %write-tag))
-(defun %read-tag (stream)  
-  (code-char (read-byte stream)))
+(defun %read-tag (stream &optional (eof-error-p t) eof-value)  
+  (let ((b (read-byte stream eof-error-p -1)))
+    (if (= b -1)
+        eof-value
+        (code-char b))))
 
 (defun %write-tag (char stream)
   (write-byte (char-code char) stream))

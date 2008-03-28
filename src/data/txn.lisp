@@ -351,7 +351,7 @@ store."
                                   :args (list ,@(make-args args)))))))))
 
 (defmethod encode-object ((object transaction) stream)
-  (%write-char #\T stream)
+  (%write-tag #\T stream)
   (%encode-symbol (transaction-function-symbol object) stream)
   (%encode-integer (transaction-timestamp object) stream)
   (%encode-list (transaction-args object) stream))
@@ -491,10 +491,10 @@ transaction, if any."
 (defmethod encode-object ((transaction anonymous-transaction) stream)
   (cond
     ((anonymous-transaction-label transaction)
-     (%write-char #\N stream)
+     (%write-tag #\N stream)
      (%encode-string (anonymous-transaction-label transaction) stream))
     (t
-     (%write-char #\G stream)))
+     (%write-tag #\G stream)))
   (%encode-list (reverse (anonymous-transaction-transactions transaction)) stream))
 
 (defmethod decode-object ((tag (eql #\G)) stream)

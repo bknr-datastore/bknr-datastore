@@ -24,7 +24,7 @@
 
 (defun convert-snapshot/encode-layout (class-name slots stream)
   (let ((id (incf *layout-counter*)))
-    (%write-char #\L stream)
+    (%write-tag #\L stream)
     (%encode-integer id stream)
     (%encode-symbol class-name stream)
     (%encode-integer (length slots) stream)
@@ -34,14 +34,14 @@
 
 (defun convert-snapshot/create-object (class objid slots values stream)
   (let ((layout-id (convert-snapshot/encode-layout class nil stream)))
-    (%write-char #\O stream)
+    (%write-tag #\O stream)
     (%encode-integer layout-id stream)
     (%encode-integer objid stream)
     (convert-snapshot/set-slots objid slots values stream)))
 
 (defun convert-snapshot/set-slots (objid slots values stream)
   (let ((layout-id (convert-snapshot/encode-layout 'dummy slots stream)))
-    (%write-char #\S stream)
+    (%write-tag #\S stream)
     (%encode-integer layout-id stream)
     (%encode-integer objid stream)
     (dolist (value values)
