@@ -1,6 +1,7 @@
 (in-package :bknr.skip-list)
 
-(use-package :unit-test)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (use-package :unit-test))
 
 (define-test-class skip-list-test-class)
 
@@ -59,14 +60,15 @@
       (test-equal (skip-list-to-list sl) nil)))
 
 
-(defun perf ()
-  (let ((sl (make-instance 'skip-list)))
-    (time (prof:with-profiling ()
-	    (dotimes (i 100000)
-	      (skip-list-insert sl i i))))
-    (prof:show-flat-profile)
-    (format t "~%~%")
-    (time (prof:with-profiling ()
-	    (dotimes (i 100000)
-	      (skip-list-search sl i))))
-    (prof:show-flat-profile)))
+;; (defun perf ()
+;;   (let ((sl (make-instance 'skip-list)))
+;;     (time (prof:with-profiling ()
+;; 	    (dotimes (i 100000)
+;; 	      (skip-list-insert sl i i))))
+;;     (prof:show-flat-profile)
+;;     (format t "~%~%")
+;;     (time (prof:with-profiling ()
+;; 	    (dotimes (i 100000)
+;; 	      (skip-list-search sl i))))
+;;     (prof:show-flat-profile)))
+

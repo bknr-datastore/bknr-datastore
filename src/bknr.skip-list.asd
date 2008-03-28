@@ -20,6 +20,6 @@
 (defsystem :bknr.skip-list.test
   :depends-on (:unit-test :bknr.skip-list) 
   :components ((:module "skip-list" :components
-                        ((:file "skip-list-test")))))
+                        ((:file "skip-list-tests")))))
 
 
