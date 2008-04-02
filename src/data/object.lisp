@@ -648,7 +648,9 @@ to cascading deletes."
   
 
 (defun find-store-object (id-or-name &key (class 'store-object) query-function key-slot-name)
-  "Mock up implementation of find-store-object API as in the old datastore"
+  "Mock up implementation of find-store-object API as in the old datastore.
+Note: QUERY-FUNCTION will only be used if ID-OR-NAME is neither an integer nor a
+string designating an integer."
   (unless id-or-name
     (error "can't search a store object with null key"))
   (when (stringp id-or-name)
