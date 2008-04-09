@@ -17,9 +17,11 @@
       (error "Could not find a store-object-subsystem in the current store ~a." *store*))
     subsystem))
 
-(defclass persistent-class (indexed-class)
-  ((transient-slot-initargs :initform nil
-			    :accessor persistent-class-transient-slot-initargs)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (finalize-inheritance 
+   (defclass persistent-class (indexed-class)
+     ((transient-slot-initargs :initform nil
+			    :accessor persistent-class-transient-slot-initargs)))))
 
 (defmethod determine-transient-slot-initargs ((class persistent-class))
   (with-slots (transient-slot-initargs) class
