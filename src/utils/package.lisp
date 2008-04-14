@@ -9,7 +9,7 @@
         #+cmu :mp
         #+openmcl :ccl)
   #+openmcl
-  (:shadow :ccl #:copy-file)
+  (:shadow :ccl #:copy-file #:make-process)
   (:shadowing-import-from :cl-interpol quote-meta-chars)
   (:export #:define-bknr-class
 
