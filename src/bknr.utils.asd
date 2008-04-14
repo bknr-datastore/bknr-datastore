@@ -29,7 +29,7 @@
 					       (:file "class" :depends-on ("package" "utils"))
 					       #+(or cmu allegro openmcl sbcl)
 					       (:file "smbpasswd" :depends-on ("utils"))
-					       #-sbcl (:file "actor" :depends-on ("utils"))
+					       (:file "actor" :depends-on ("utils" "acl-mp-compat"))
 					       (:file "reader" :depends-on ("utils"))
 					       (:file "crypt-md5" :depends-on ("utils"))
 					       (:file "capability" :depends-on ("utils"))
