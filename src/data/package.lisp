@@ -42,7 +42,6 @@
 	   #:store-object
 	   #:store-object-store
 	   #:store-object-id
-	   #:store-object-subsystem
 
 	   #:delete-object
 	   #:delete-objects
@@ -103,9 +102,15 @@
 	   #:rename-file-to-blob
 	   #:store-blob-root-tempdir
 
+	   #:find-refs
+
+           ;; Subsystems and subsystem API
 	   #:store-object-subsystem
 	   #:blob-subsystem
 
-	   #:find-refs))
+           #:initialize-subsystem
+           #:snapshot-subsystem
+           #:restore-subsystem
+           #:ensure-store-current-directory))
 
 
