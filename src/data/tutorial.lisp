@@ -112,22 +112,17 @@
 ;;; transaction code and that will be called in the context of the
 ;;; transaction, and logged to disk.
 
-(PROGN
- (DEFUN TX-DECF-COUNTER ()
-   (UNLESS (IN-TRANSACTION-P) (ERROR 'NOT-IN-TRANSACTION))
-   (DECF (TUTORIAL-STORE-COUNTER *STORE*)))
- (DEFUN DECF-COUNTER (&REST #:G3047)
-   (EXECUTE
-    (MAKE-INSTANCE 'TRANSACTION
-                   :FUNCTION-SYMBOL
-                   'TX-DECF-COUNTER
-                   :TIMESTAMP
-                   (GET-UNIVERSAL-TIME)
-                   :ARGS
-                   #:G3047))))
+(PROGN (DEFUN TX-DECF-COUNTER ()
+         (UNLESS (IN-TRANSACTION-P) (ERROR 'NOT-IN-TRANSACTION))
+         (DECF (TUTORIAL-STORE-COUNTER *STORE*)))
+       (DEFUN DECF-COUNTER ()
+         (EXECUTE (MAKE-INSTANCE 'TRANSACTION
+                                 :FUNCTION-SYMBOL 'TX-DECF-COUNTER
+                                 :TIMESTAMP (GET-UNIVERSAL-TIME)
+                                 :ARGS (LIST)))))
 
 ;;; The new datastore only supports a single datastore instance per
-;;; LISP session. When creating a `STORE' object, the `*STORE*'
+;;; LISP instance. When creating a `STORE' object, the `*STORE*'
 ;;; special variable is modified to point to the datastore. Thus, we
 ;;; can create our simple datastore by creating an object of type
 ;;; `TUTORIAL-STORE'. The transaction log will be store in the
@@ -212,24 +207,22 @@
 (setf *store-debug* t)
 ; => T
 (restore-store *store*)
-; Warning:  restoring #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
-; Warning:  loading transaction log
-; /tmp/tutorial-store/current/transaction-log
-; executing transaction #$(TX-INCF-COUNTER) at timestamp 3309258381
-; executing transaction #$(TX-INCF-COUNTER) at timestamp 3309258383
-; executing transaction #$(TX-DECF-COUNTER) at timestamp 3309258387
-; executing transaction #$(TX-INCF-COUNTER) at timestamp 3309258390
-; => :NORMAL
+; restoring #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
+; loading transaction log /tmp/tutorial-store/current/transaction-log
+; executing transaction #<TRANSACTION 21.04.2008 07:08:22 TX-INCF-COUNTER > at timestamp 3417743302
+; executing transaction #<TRANSACTION 21.04.2008 07:08:25 TX-INCF-COUNTER > at timestamp 3417743305
+; executing transaction #<TRANSACTION 21.04.2008 07:08:26 TX-DECF-COUNTER > at timestamp 3417743306
+; executing transaction #<TRANSACTION 21.04.2008 07:08:34 TX-INCF-COUNTER > at timestamp 3417743314
+; => NIL
 (tutorial-store-counter *store*)
 ; => 2
-(restore-store *store* :until 3309258387)
-; Warning:  restoring #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
-; Warning:  loading transaction log
-; /tmp/tutorial-store/current/transaction-log
-; executing transaction #$(TX-INCF-COUNTER) at timestamp 3309258381
-; executing transaction #$(TX-INCF-COUNTER) at timestamp 3309258383
-; executing transaction #$(TX-DECF-COUNTER) at timestamp 3309258387
-; => :NORMAL
+; !! Update the timestamp below to correspond to the fist transaction executed above !!
+(restore-store *store* :until 3417743302) ...
+; restoring #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
+; loading transaction log /tmp/tutorial-store/current/transaction-log
+; executing transaction #<TRANSACTION 21.04.2008 07:08:22 TX-INCF-COUNTER > at timestamp 3417743302
+; creating log file backup: /tmp/tutorial-store/current/transaction-log.backup
+; truncating transaction log at position 42.
 (tutorial-store-counter *store*)
 ; => 1
 
@@ -303,10 +296,13 @@
 ; /tmp/tutorial-store/current/transaction-log
 ; => #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
 (snapshot)
+; Snapshotting subsystem #<COUNTER-SUBSYSTEM #xE65F866> of #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
+; Successfully snapshotted #<COUNTER-SUBSYSTEM #xE65F866> of #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
 ; => NIL
 (restore)
-; Warning:  restoring #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
-; => :NORMAL
+; restoring #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
+; Restoring the subsystem #<COUNTER-SUBSYSTEM #xE65F866> of #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
+; => NUL
 
 ;;;# An object store example
 
@@ -345,7 +341,8 @@
 			    (make-instance 'store-object-subsystem)))
 
 ; Warning:  restoring #<MP-STORE DIR: "/tmp/object-store/">
-; => #<MP-STORE DIR: "/tmp/object-store/">
+; restoring #<MP-STORE DIR: "/tmp/object-store/">
+; Restoring the subsystem #<STORE-OBJECT-SUBSYSTEM #xE63F866> of #<MP-STORE DIR: "/tmp/object-store/">
 (all-store-objects)
 ; => NIL
 
@@ -370,14 +367,12 @@
 ;;; transaction log, and remove the object from all its indices.
 
 (make-object 'store-object)
-; executing transaction #$(TX-MAKE-OBJECT STORE-OBJECT)
-; at timestamp 3309260107
+; executing transaction #<TRANSACTION 21.04.2008 08:02:10 TX-MAKE-OBJECT STORE-OBJECT ID 2> at timestamp 3417746530
 ; => #<STORE-OBJECT ID: 12>
 (store-object-with-id 2)
 ; => #<STORE-OBJECT ID: 2>
 (delete-object (store-object-with-id 2))
-; executing transaction #$(TX-DELETE-OBJECT 2)
-; at timestamp 3309260112
+; executing transaction #<TRANSACTION 21.04.2008 08:52:14 TX-DELETE-OBJECT 2> at timestamp 3417749534
 ; => T
 (store-object-with-id 2)
 ; => NIL
@@ -437,26 +432,25 @@
 ;  #<FOO ID: 2> #<TUTORIAL-OBJECT ID: 3>
 ;  #<TUTORIAL-OBJECT ID: 4> #<TUTORIAL-OBJECT ID: 5>)
 
-;;; A basic transaction used to work on persistent objects is the
-;;; transaction `CHANGE-SLOT-VALUES', which sets the values of slots
-;;; in an object. The value of a persistent slot can not be changed
-;;; outside of a transaction, as restoring the datastore would not
-;;; change the slot value.
+;;; In order to change the slot values of persistent object, the
+;;; application needs to be in a transaction context.  This can be
+;;; done either by invoking a named transaction as above, or by
+;;; creating an anonymous transaction.  In an anonymous transaction,
+;;; all write accesses to persistent objects are logged.
 
 (define-persistent-class tutorial-object2 ()
   ((b :update)))
 
 (make-object 'tutorial-object2 :b 3)
-; executing transaction #$(TX-MAKE-OBJECT TUTORIAL-OBJECT2 B 3)
-; at timestamp 3309263046
-; => #<TUTORIAL-OBJECT2 ID: 16>
-(setf (slot-value (store-object-with-id 16) 'b) 4)
+; executing transaction #<TRANSACTION 21.04.2008 08:03:27 TX-MAKE-OBJECT TUTORIAL-OBJECT2 ID 6 B 3> at timestamp 3417746607
+; => #<TUTORIAL-OBJECT2 ID: 6>
+(setf (slot-value (store-object-with-id 6) 'b) 4)
 ; => Error
-(change-slot-values (store-object-with-id 16) 'b 4)
-; executing transaction #$(TX-CHANGE-SLOT-VALUES
-; #<TUTORIAL-OBJECT2 ID: 16> B 4) at timestamp 3309263109
-; => NIL
-(tutorial-object2-b (store-object-with-id 16))
+; Attempt to set persistent slot B of #<TUTORIAL-OBJECT2 ID: 6> outside of a transaction
+(with-transaction ()
+  (setf (slot-value (store-object-with-id 6) 'b) 4))
+; => 4
+(tutorial-object2-b (store-object-with-id 6))
 ; => 4
 
 ;;;## Object creation and deletion protocol
@@ -483,17 +477,17 @@
 
 ;;; We can modify the slot `A' outside a transaction:
 (make-object 'protocol-object :a 1 :b 2)
-; executing transaction #$(TX-MAKE-OBJECT PROTOCOL-OBJECT A 1 B 2)
-; at timestamp 3309262613
-; => #<PROTOCOL-OBJECT ID: 14>
-(setf (protocol-object-a *) 2)
+; executing transaction #<TRANSACTION 21.04.2008 08:10:49 TX-MAKE-OBJECT PROTOCOL-OBJECT ID 7 A 1 B 2> at timestamp 3417747049
+; => #<PROTOCOL-OBJECT ID: 7>
+(setf (protocol-object-a (store-object-with-id 7)) 2)
 ; => 2
 
 ;;; However, we cannot modify the slot `B', as it is persistent and
 ;;; has to be changed inside a transaction.
 
-(setf (protocol-object-b (store-object-with-id 14)) 4)
+(setf (protocol-object-b (store-object-with-id 7)) 4)
 ; => Error
+; Attempt to set persistent slot B of #<PROTOCOL-OBJECT ID: 7> outside of a transaction
 
 ;;; An object can be removed from the datastore using the transaction
 ;;; `DELETE-OBJECT', which calls the method `DESTROY-OBJECT' on the
@@ -506,25 +500,19 @@
 ;;; We can snapshot the persistent state of all created objects by
 ;;; using `SNAPSHOT'.
 (snapshot)
-; Warning:  Backup of the datastore in
-; /tmp/object-store/20041112T153046/.
-; Warning:
-;   Snapshotting subsystem #<STORE-OBJECT-SUBSYSTEM {49396ED5}>
-;    of #<MP-STORE DIR: "/tmp/object-store/">...
-; Warning:
-;   Successfully snapshotted #<STORE-OBJECT-SUBSYSTEM {49396ED5}>
-;   of #<MP-STORE DIR: "/tmp/object-store/">.
-; => NIL
+; Snapshotting subsystem #<STORE-OBJECT-SUBSYSTEM #xE54991E> of #<MP-STORE DIR: "/tmp/object-store/">
+; Successfully snapshotted #<STORE-OBJECT-SUBSYSTEM #xE54991E> of #<MP-STORE DIR: "/tmp/object-store/">
 
 ;;; This will create a backup directory containing the old transaction
 ;;; log, and the creation of a snapshot file in the "current"
 ;;; directory.
 
 (directory "/tmp/object-store/**/*.*")
-; => (#p"/tmp/object-store/20041112T153046/"
-;  #p"/tmp/object-store/20041112T153046/transaction-log"
-;  #p"/tmp/object-store/current/"
-;  #p"/tmp/object-store/current/store-object-subsystem-snapshot")
+; => (#P"/tmp/object-store/20080421T061210/random-state"
+;     #P"/tmp/object-store/20080421T061210/transaction-log"
+;     #P"/tmp/object-store/current/random-state"
+;     #P"/tmp/object-store/current/store-object-subsystem-snapshot"
+;     #P"/tmp/object-store/current/transaction-log")
 
 ;;; The snapshot file contains all persistent objects present at
 ;;; snapshotting time, and the value of their persistent
@@ -548,20 +536,15 @@
 	 :index-keys all-gorilla-moods)))
 
 (make-object 'gorilla :name "lucy" :mood :aggressive)
-; => #<GORILLA ID: 17>
+; => #<GORILLA ID: 8>
 (make-object 'gorilla :name "john" :mood :playful)
-; => #<GORILLA ID: 18>
+; => #<GORILLA ID: 9>
 (make-object 'gorilla :name "peter" :mood :playful)
-; => #<GORILLA ID: 19>
+; => #<GORILLA ID: 10>
 (gorilla-with-name "lucy")
-; => #<GORILLA ID: 17>
+; => #<GORILLA ID: 8>
 (gorillas-with-mood :playful)
-; => (#<GORILLA ID: 19> #<GORILLA ID: 18>)
-
-;;;## Exporting store objects to XML
-
-;;; Exporting store objects to XML is not possible right now, but it
-;;; will soon be available in the BKNR Framework. Stay tuned.
+; => (#<GORILLA ID: 10> #<GORILLA ID: 9>)
 
 ;;;## Adding blobs
 
@@ -598,6 +581,7 @@
 ;;; We can now add blob support to our existing object datastore by
 ;;; adding the blob subsystem to its list of subsystems.
 
+(close-store)
 (make-instance 'mp-store :directory "/tmp/object-store/"
 	       :subsystems (list
 			    (make-instance 'store-object-subsystem)
@@ -618,9 +602,9 @@
 ;;; binary data is then stored in a file named after the ID of the
 ;;; object in the blob root directory of the blob subsystem.
 
-(make-blob-from-file "/tmp/bla.png" 'photo :name "foobar"
-		     :type :png)
-; => #<PHOTO ID: 16, TYPE: png>
+(make-blob-from-file "/tmp/bla.jpg" 'photo :name "foobar"
+		     :type :jpg)
+; => #<PHOTO ID: 11, TYPE: jpg>
 
 ;;; We can work with the photo object in the same way as when we work
 ;;; with a normal object. However, we can access the binary data using
@@ -628,8 +612,8 @@
 ;;; file in the blob root that holds the binary data of the
 ;;; object.
 
-(blob-pathname (store-object-with-id 16))
-; => #p"/tmp/object-store/blob-root/16"
+(blob-pathname (store-object-with-id 11))
+; => #P"/tmp/object-store/blob-root/11"
 
 ;;; The method `BLOB-TO-FILE' and `BLOB-TO-STREAM' write the binary
 ;;; data of the object to the specified file or stream (the stream has
@@ -656,29 +640,36 @@
   ((a :update :relaxed-object-reference t)))
 
 (make-object 'relaxed-object)
-; => #<RELAXED-OBJECT ID: 20>
+; => #<RELAXED-OBJECT ID: 12>
 (make-object 'relaxed-object)
-; => #<RELAXED-OBJECT ID: 21>
-(change-slot-values (store-object-with-id 19)
-		    'a (store-object-with-id 20))
-; => NIL
-(delete-object (store-object-with-id 20))
+; => #<RELAXED-OBJECT ID: 13>
+(with-transaction ()
+  (setf (slot-value (store-object-with-id 12) 'a) (store-object-with-id 13)))
+; => #<RELAXED-OBJECT ID: 13>
+(delete-object (store-object-with-id 13))
 ; => T
 (snapshot)
-; Warning:
-;    Encoding reference to destroyed object with ID 20
-;    from slot A of object RELAXED-OBJECT with ID 19.
+; Warning: Backup of the datastore in /tmp/object-store/20080421T064811/.
+; While executing: (:INTERNAL (SNAPSHOT-STORE (STORE))), in process worker(1750).
+; Snapshotting subsystem #<STORE-OBJECT-SUBSYSTEM #xE6069EE> of #<MP-STORE DIR: "/tmp/object-store/">
+; Warning: Encoding reference to destroyed object with ID 13 from slot A of object RELAXED-OBJECT with ID 12.
+; While executing: #<STANDARD-METHOD ENCODE-OBJECT (STORE-OBJECT T)>, in process worker(1750).
+; Successfully snapshotted #<STORE-OBJECT-SUBSYSTEM #xE6069EE> of #<MP-STORE DIR: "/tmp/object-store/">
+; Snapshotting subsystem #<BLOB-SUBSYSTEM #xE6069CE> of #<MP-STORE DIR: "/tmp/object-store/">
+; Successfully snapshotted #<BLOB-SUBSYSTEM #xE6069CE> of #<MP-STORE DIR: "/tmp/object-store/">
 ; => NIL
 (restore)
-; Warning:  restoring #<MP-STORE DIR: "/tmp/object-store/">
-; Warning:
-;    loading snapshot file
-;    /tmp/object-store/current/store-object-subsystem-snapshot
-; Warning:
-;    Reference to inexistent object with id 20 in
-; relaxed slot A of object with class RELAXED-OBJECT with ID 19.
-; => :NORMAL
-(relaxed-object-a (store-object-with-id 19))
+; restoring #<MP-STORE DIR: "/tmp/object-store/">
+; Restoring the subsystem #<STORE-OBJECT-SUBSYSTEM #xE6069EE> of #<MP-STORE DIR: "/tmp/object-store/">
+; loading snapshot file /tmp/object-store/current/store-object-subsystem-snapshot
+; Warning: internal inconsistency during restore: can't find store object 13 in loaded store
+; While executing: %DECODE-STORE-OBJECT, in process worker(1754).
+; Warning: Reference to inexistent object with id 13 from unnamed container, returning NIL.
+; While executing: %DECODE-STORE-OBJECT, in process worker(1754).
+; Restoring the subsystem #<BLOB-SUBSYSTEM #xE6069CE> of #<MP-STORE DIR: "/tmp/object-store/">
+; loading transaction log /tmp/object-store/current/transaction-log
+; executing transaction #<ANONYMOUS-TRANSACTION 21.04.2008 08:48:48 PREPARE-FOR-SNAPSHOT NIL> at timestamp 3417749328
+(relaxed-object-a (store-object-with-id 12))
 ; => NIL
 
 ;;;# Store internals

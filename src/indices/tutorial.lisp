@@ -23,9 +23,9 @@
 ;;;# Obtaining and loading BKNR slot indices
 ;;;
 ;;; You can obtain the current CVS sources of BKNR by following the
-;;; instructions at `http://bknr.net/blog/bknr-devel'. Add the `src'
-;;; directory of BKNR to your `asdf:*central-registry*', and load the
-;;; indices module by evaluating the following form:
+;;; instructions at `http://bknr.net/'. Add the `src' directory of
+;;; BKNR to your `asdf:*central-registry*', and load the indices
+;;; module by evaluating the following form:
 
 (asdf:oos 'asdf:load-op :bknr-indices)
 
@@ -290,7 +290,7 @@
 ; => (#<TEST-SLOT 1> #<TEST-SLOT 2>)
 (all-test-slot2s-bs)
 ; (#<TEST-SLOT2 3> #<TEST-SLOT2 4> #<TEST-SLOT2 5>)
-(map-test-slot2s #'(lambda (obj) (print obj)))
+(map-test-slot2s (lambda (obj) (print obj)))
 ; 
 ; #<TEST-SLOT2 3> 
 ; #<TEST-SLOT2 4> 
@@ -427,14 +427,11 @@
 (test-with-coords '(5 5 0))
 ; => #<TEST-CLASS2 5,5,0>
 
-#|
-
 ;;; XXX the class index tutorial needs updating, please skip to next section!
 
 ;;; Another example of a class index is the `CLASS-INDEX' index.
 
-(defvar *class-index*
-  (index-create 'class-index :index-subclasses t))
+(defvar *class-index* (index-create 'class-index))
 
 (defclass base-object ()
   ()
@@ -487,7 +484,6 @@
 (objects-of-class 'base-object)
 ; => NIL
 ; NIL
-|#
 
 ;;;## Destroying objects
 ;;;
@@ -497,11 +493,13 @@
 ;;; from all its indices, and sets the slot `DESTROYED-P' to `T', so
 ;;; that not slot-access is possible anymore on the object.
 
+(make-instance 'test-class2 :x 5 :y 5 :z 0)
+
 (let ((obj (test-with-coords '(5 5 0))))
   (destroy-object obj)
 
-;;; This will throw an error.
-;;;
+;;; This will throw an error:
+;;;   Can not get slot X of destroyed object of class TEST-CLASS.
 
   (test-class-x obj))
 
@@ -521,7 +519,7 @@
 ;;; Indices for new slots or new class indices are obviously empty on
 ;;; creation, and will be filled when the existing instances are
 ;;; updated. For now, `SHARED-INITIALIZE' is not overloaded, so the
-;;; instance update are noticed through `(SETF SLOT-VALUE-USING-CLASS)'.
+;;; instance updates are noticed through `(SETF SLOT-VALUE-USING-CLASS)'.
 
 ;;;# Creating a custom index
 ;;;
