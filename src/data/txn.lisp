@@ -503,8 +503,7 @@ transaction, if any."
 
 (defmethod decode-object ((tag (eql #\N)) stream)
   (make-instance 'anonymous-transaction
-		 :label (%decode-string stream)
-		 :transactions (%decode-list stream)))
+		 :label (%decode-string stream)))
 
 (defmacro with-transaction ((&optional label) &body body)
   (let ((txn (gensym)))
@@ -516,8 +515,14 @@ transaction, if any."
 	   ,@body)))))
 
 (defmethod execute-unlogged ((transaction anonymous-transaction))
-  (dolist (transaction (anonymous-transaction-transactions transaction))
-    (execute-unlogged transaction)))
+  ;; EXECUTE-UNLOGGED is called for anonymous transactions only when restoring from the transaction log.
+  (assert (eq :restore (store-state *store*)) () "Unexpected store state ~A for EXECUTE-UNLOGGED on an anonymous transaction" (store-state *store*))
+  (let ((subtxns (%decode-integer *txn-log-stream*)))
+    (dotimes (i subtxns)
+      (execute-unlogged (decode *txn-log-stream*)))
+    (when (plusp subtxns)
+      ;; In order to maintain the previous on-disk format, we read the last cdr of the list
+      (assert (eq nil (decode *txn-log-stream*))))))
 
 (defmethod execute-transaction :after ((executor anonymous-transaction) transaction)
   (push transaction (anonymous-transaction-transactions executor)))
@@ -600,6 +605,11 @@ pathname until a non-existant directory name has been found."
   #+sbcl
   (sb-posix:truncate (namestring pathname) position))
 
+(defvar *txn-log-stream* nil
+  "This variable is bound to the transaction log stream while loading
+   the transaction log.  It is used by anonymous transactions to read
+   the subtransactions from the log.")
+
 (defun load-transaction-log (pathname &key until)
   (let (length position)
     (restart-case
@@ -620,7 +630,8 @@ pathname until a non-existant directory name has been found."
                (t
                 (when *show-transactions*
                   (format t "~&;;; ~A txn @~D: ~A~%" (transaction-timestamp txn) position txn))
-                (execute-unlogged txn))))))
+                (let ((*txn-log-stream* s))
+                  (execute-unlogged txn)))))))
       (discard ()
         :report "Discard rest of transaction log."
         (truncate-log pathname position)))))
@@ -641,12 +652,10 @@ pathname until a non-existant directory name has been found."
 	  (close-transaction-log-stream store)
 	  (let ((transaction-log (store-transaction-log-pathname store))
 		(error t))
-	    
 	  ;;; restore the subsystems
-	    
 	    (unwind-protect
 		 (progn
-		   ;; die subsystems duerfen beim restore nichts persistentes machen
+		   ;; Subsystems may not do any persistent changes when restoring.
 		   (dolist (subsystem (store-subsystems store))
 		       ;;; check that UNTIL > snapshot date
 		     (when *store-debug*

@@ -114,3 +114,17 @@
   (time (bknr.datastore::without-sync ()
           (map-store-objects #'delete-object)))
   (test-equal (all-store-objects) nil))
+
+(define-persistent-class parent ()
+  ((child :update :initform nil)))
+
+(define-persistent-class child ()
+  ())
+
+(define-datastore-test "Serialize circular dependency in anonymous txn"
+  (let ((parent (make-object 'parent)))
+    (with-transaction (:circular)
+      (setf (parent-child parent) (make-object 'child))))
+  (restore)
+  (test-equal (find-class 'child)
+              (class-of (parent-child (first (class-instances 'parent))))))

@@ -16,6 +16,23 @@ x rollforward until, restore until, usw...
 - XXXX broken initialize-persistent-instance (?)
 
 - Within anonymous transactions, circular dependencies are not
-  correctly serialized.  Thus, an object that is created in the
-  anonymous transactions links itself to another object, it may fail
-  to restore correctly.  See anon-circular-test.lisp for an example.
+  correctly serialized.  If an object that is created in the anonymous
+  transactions links itself to another object, it may fail to restore
+  correctly.  See anon-circular-test.lisp for an example.
+
+  The issue here is that the anonymous transaction is first completely
+  read from the transaction log before the transaction is executed.
+  When reading a change-slot-values transaction in an anonymous
+  transaction that references an object that has been created in the
+  same transaction, it fails to find this new object and deserializes
+  it as NIL.
+
+  The best solution to the problem is to actually execute the
+  subtransactions of an anonymous transaction while reading the
+  transaction log instead of first reading, then executing.  The
+  downside of this is that if the anonymous transaction was written
+  incompletely, it will be partially restored before the error is
+  detected.  There needs to be a restart in place for anonymous
+  transactions that makes it possible to easily truncate the txn log
+  before the partially written anonymous transaction begins so that
+  the user has a way to restore to just that point.
