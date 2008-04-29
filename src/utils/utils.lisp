@@ -514,10 +514,10 @@ it is assumed that the string specifies the MIME type."
 	nconc (list key (eval value))))
 
 #-allegro
-(defun file-contents (pathname)
-  (with-open-file (s pathname :element-type '(unsigned-byte 8))
+(defun file-contents (pathname &key (element-type '(unsigned-byte 8)))
+  (with-open-file (s pathname :element-type element-type)
     (let ((result
-           (make-array (file-length s) :element-type '(unsigned-byte 8))))
+           (make-array (file-length s) :element-type element-type)))
       (read-sequence result s)
       result)))
 
