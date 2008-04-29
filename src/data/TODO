@@ -15,3 +15,4 @@ x rollforward until, restore until, usw...
 
 - XXXX broken initialize-persistent-instance (?)
 
+- Get rid of MAKE-OBJECT, use MAKE-INSTANCE instead

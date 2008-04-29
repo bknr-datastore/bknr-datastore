@@ -501,7 +501,21 @@ transaction, if any."
   (make-instance 'anonymous-transaction
 		 :transactions (%decode-list stream)))
 
+(defvar *txn-log-stream* nil
+  "This variable is bound to the transaction log stream while loading
+   the transaction log.  It is used by anonymous transactions to read
+   the subtransactions from the log.")
+
 (defmethod decode-object ((tag (eql #\N)) stream)
+  ;; When decoding an anonymous transaction from the transaction log,
+  ;; we only read its name.  The subtransaction are not read here, but
+  ;; rather in EXECUTE-UNLOGGED below.  The reason for this is that we
+  ;; need to execute the subtransactions while reading them, as we'd
+  ;; otherwise not be able to properly deserialize references to
+  ;; objects that have been created within this anonymous transaction.
+
+  ;; Thus, while restoring, the TRANSACTIONS slot of the anonymous
+  ;; transaction object is not used.
   (make-instance 'anonymous-transaction
 		 :label (%decode-string stream)))
 
@@ -515,8 +529,11 @@ transaction, if any."
 	   ,@body)))))
 
 (defmethod execute-unlogged ((transaction anonymous-transaction))
-  ;; EXECUTE-UNLOGGED is called for anonymous transactions only when restoring from the transaction log.
-  (assert (eq :restore (store-state *store*)) () "Unexpected store state ~A for EXECUTE-UNLOGGED on an anonymous transaction" (store-state *store*))
+  ;; EXECUTE-UNLOGGED is called for anonymous transactions only when
+  ;; restoring from the transaction log.  It reads and executes the
+  ;; subtransactions from the transaction log.
+  (assert (eq :restore (store-state *store*)) ()
+          "Unexpected store state ~A for EXECUTE-UNLOGGED on an anonymous transaction" (store-state *store*))
   (let ((subtxns (%decode-integer *txn-log-stream*)))
     (dotimes (i subtxns)
       (execute-unlogged (decode *txn-log-stream*)))
@@ -603,26 +620,26 @@ pathname until a non-existant directory name has been found."
   #+cmu
   (unix:unix-truncate (ext:unix-namestring pathname) position)
   #+sbcl
-  (sb-posix:truncate (namestring pathname) position))
-
-(defvar *txn-log-stream* nil
-  "This variable is bound to the transaction log stream while loading
-   the transaction log.  It is used by anonymous transactions to read
-   the subtransactions from the log.")
+  (sb-posix:truncate (namestring pathname) position)
+  #+openmcl
+  (ccl:with-cstrs ((filename (namestring pathname)))
+    (#_truncate filename position))
+  #-(or cmu sbcl openmcl)
+  (error "don't know how to truncate files on this platform"))
 
 (defun load-transaction-log (pathname &key until)
-  (let (length position)
+  (let (length position txn)
     (restart-case
         (with-open-file (s pathname
                            :element-type '(unsigned-byte 8)
                            :direction :input)
           (setf length (file-length s))
           (loop
-           (setf position (file-position s))
-           (unless (< position length)
-             (return))
-	   (let ((txn (decode s)))
-	     (cond
+             (setf position (file-position s))
+             (unless (< position length)
+               (return))
+             (setf txn (decode s))
+             (cond
                ((and until
                      (> (transaction-timestamp txn) until))
                 (truncate-log pathname position)
@@ -631,10 +648,13 @@ pathname until a non-existant directory name has been found."
                 (when *show-transactions*
                   (format t "~&;;; ~A txn @~D: ~A~%" (transaction-timestamp txn) position txn))
                 (let ((*txn-log-stream* s))
-                  (execute-unlogged txn)))))))
+                  (execute-unlogged txn))))))
       (discard ()
-        :report "Discard rest of transaction log."
-        (truncate-log pathname position)))))
+        :report (lambda (stream) (format stream "Discard transaction log before failing transaction ~A." txn))
+        (truncate-log pathname position)
+        ;; Should maybe throw instead of recursively restoring?  Maybe
+        ;; not, we'll never go into depths > 1 anyway.
+        (restore)))))
 
 (defgeneric restore-subsystem (store subsystem &key until))
 
