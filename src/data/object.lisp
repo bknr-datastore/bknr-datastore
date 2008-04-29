@@ -639,15 +639,26 @@ to cascading deletes."
 	     object))
     (apply #'delete-objects object cascading-delete-refs)))
 
-(deftransaction change-slot-values (object &rest slots-and-values)
-  (warn "CHANGE-SLOT-VALUES is deprecated - use WITH-TRANSACTION and standard accessors!")
+(defun tx-change-slot-values (object &rest slots-and-values)
+  "Called by the MOP to change a persistent slot's value."
+  (unless (in-transaction-p)
+    (error 'not-in-transaction))
   (when object
     (loop for (slot value) on slots-and-values by #'cddr
-          do (setf (slot-value object slot) value))))
+       do (setf (slot-value object slot) value))))
+
+(defun change-slot-values (object &rest slots-and-values)
+  "This function is the deprecated way to set slots of persistent
+   objects."
+  (declare (ignore slots-and-values))
+  (warn "CHANGE-SLOT-VALUES is deprecated - use WITH-TRANSACTION and standard accessors!")
+  (execute (make-instance 'transaction
+                          :function-symbol 'tx-change-slot-values
+                          :timestamp (get-universal-time)
+                          :args (list object))))
 
 (defmethod prepare-for-snapshot (object)
   nil)
-  
 
 (defun find-store-object (id-or-name &key (class 'store-object) query-function key-slot-name)
   "Mock up implementation of find-store-object API as in the old datastore.
