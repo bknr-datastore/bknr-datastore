@@ -564,9 +564,16 @@ a snapshot."))
        and
        collect value))
 
-;;; create object transaction, should not be called from user code, as we have to give it
-;;; a unique id in the initargs. After the object is created, the persistent and the
-;;; transient instances are initialized
+;;; In order to avoid concurrency problems, we lock creation of
+;;; objects early.  Otherwise, we may run into the situation that an
+;;; object id is used for two objects.
+
+(defvar *make-object-lock* (mp-make-lock))
+
+;;; create object transaction, should not be called from user code, as
+;;; we have to give it a unique id in the initargs. After the object
+;;; is created, the persistent and the transient instances are
+;;; initialized
 (defun tx-make-object (class-name &rest initargs)
   (let (obj
 	(error t))
@@ -585,11 +592,12 @@ a snapshot."))
 
 (defun make-object (class-name &rest initargs)
   "Make a persistent object of class named CLASS-NAME. Calls MAKE-INSTANCE with INITARGS."
-  (execute (make-instance 'transaction
-			  :function-symbol 'tx-make-object
-			  :args (append (list class-name
-					      :id (next-object-id (store-object-subsystem)))
-					initargs))))
+  (mp-with-recursive-lock-held (*make-object-lock*)
+    (execute (make-instance 'transaction
+                            :function-symbol 'tx-make-object
+                            :args (append (list class-name
+                                                :id (next-object-id (store-object-subsystem)))
+                                          initargs)))))
 
 (defun tx-delete-object (id)
   (destroy-object (store-object-with-id id)))
