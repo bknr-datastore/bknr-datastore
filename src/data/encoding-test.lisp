@@ -116,7 +116,8 @@
                (bknr.datastore::%decode-string in))))    
     (test:is (string-equal "<=>" (decode-string-from-octets #(1 3 60 61 62))))
     ;; #\? is the substitution char
-    (test:is (string-equal "<?>" (decode-string-from-octets #(1 3 60 188 62))))
+    (test:signals flexi-streams:external-format-encoding-error
+      (string-equal "<?>" (decode-string-from-octets #(1 3 60 188 62))))
     ;; kilian 2008-03-20: the following for-all test failed on ccl,
     ;; because the correct utf-8 sequence could produce a char-code
     ;; above char-code-limit - bknr.datastore::%decode-string should
