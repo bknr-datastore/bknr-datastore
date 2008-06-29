@@ -27,7 +27,7 @@
 ;;; BKNR to your `asdf:*central-registry*', and load the indices
 ;;; module by evaluating the following form:
 
-(asdf:oos 'asdf:load-op :bknr-indices)
+(asdf:oos 'asdf:load-op :bknr.indices)
 
 ;;; Then switch to the `bknr.indices' package to try out the tutorial.
 
@@ -144,7 +144,7 @@
 
 (make-instance 'gorilla :name "Lucy" :description :aggressive)
 (make-instance 'gorilla :name "Robert" :description :playful)
-(make-instance 'gorilla :name "John" :description :aggressive)))
+(make-instance 'gorilla :name "John" :description :aggressive)
 
 (all-gorillas)
 ; => (#<GORILLA "Lucy"> #<GORILLA "Robert"> #<GORILLA "John">)
