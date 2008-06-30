@@ -429,8 +429,8 @@ to the log file in an atomic group"))
       (with-log-guard ()
         (fsync (store-transaction-log-stream *store*)))))
 
-;;; XXX transaction evaluated twice
 (defmacro with-transaction-log ((transaction) &body body)
+  (check-type transaction symbol) ; otherwise care for multiple evaluation
   `(with-store-guard ()
      (when (in-transaction-p)
        (error "can't open nested with-transaction-log blocks"))
