@@ -338,7 +338,13 @@
 (defun %decode-string (stream)
   (labels ((octets-to-string-safe (octets) ; safe and portable
              (let ((flexi-streams:*substitution-char* #\?))
-               (flexi-streams:octets-to-string octets :external-format #.(flexi-streams:make-external-format :utf-8))))
+               (handler-case
+                   (flexi-streams:octets-to-string octets :external-format :utf-8)
+                 (flexi-streams:external-format-condition (e)
+                   (declare (ignore e))
+                   (let ((string (flexi-streams:octets-to-string octets :external-format :ascii)))
+                     (warn "could not decode string ~S as utf-8, decoded as ASCII" string)
+                     string)))))
            (octets-to-string (octets)
              (handler-case
                  (trivial-utf-8:utf-8-bytes-to-string octets)
