@@ -8,8 +8,10 @@
   (mp:make-process-lock :name name)
   #+sbcl
   (sb-thread:make-mutex :name name)
-  #+cmu
+  #+(and cmu x86)
   (mp:make-lock name)
+  #+(and cmu (not x86))
+  (declare (ignore name))
   #+openmcl
   (ccl:make-lock name)
   #+lispworks
