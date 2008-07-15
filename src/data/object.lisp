@@ -89,7 +89,8 @@ deleted, slot reads will return nil."
                (not (in-transaction-p)))
       (error "Attempt to set persistent slot ~A of ~A outside of a transaction"
              slot-name object))
-    (unless (eq 'last-change slot-name)
+    (unless (or (eq :restore (store-state *store*))
+		(eq 'last-change slot-name))
       (setf (slot-value object 'last-change) (current-transaction-timestamp)))))
 
 (defmethod (setf slot-value-using-class) :after (newval (class persistent-class) object slotd)
