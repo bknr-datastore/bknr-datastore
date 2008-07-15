@@ -28,6 +28,7 @@
 	   #:transaction-function-symbol
 	   #:transaction-args
 	   #:transaction-timestamp
+           #:current-transaction-timestamp
 	   #:in-transaction-p
 	   #:deftransaction
 
@@ -42,6 +43,8 @@
 	   #:store-object
 	   #:store-object-store
 	   #:store-object-id
+           #:store-object-last-change
+           #:store-object-touch
 
 	   #:delete-object
 	   #:delete-objects

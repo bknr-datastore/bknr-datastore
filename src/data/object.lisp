@@ -90,7 +90,7 @@ deleted, slot reads will return nil."
       (error "Attempt to set persistent slot ~A of ~A outside of a transaction"
              slot-name object))
     (unless (eq 'last-change slot-name)
-      (setf (slot-value object 'last-change) (transaction-timestamp *current-transaction*)))))
+      (setf (slot-value object 'last-change) (current-transaction-timestamp)))))
 
 (defmethod (setf slot-value-using-class) :after (newval (class persistent-class) object slotd)
   (when (in-anonymous-transaction-p)
@@ -150,6 +150,40 @@ deleted, slot reads will return nil."
   (unless (find-class class)
     (error "class-instances called for nonexistent class ~A" class))
   (store-objects-with-class class))
+
+(deftransaction store-object-touch (object)
+  "Update the LAST-CHANGE slot to reflect the current transaction timestamp."
+  (setf (slot-value object 'last-change) (current-transaction-timestamp)))
+
+(defgeneric store-object-last-change (object depth)
+  (:documentation "Return the last change time of the OBJECT.  DEPTH
+  determines how deep the object graph will be traversed.")
+
+  (:method (object depth)
+    0)
+
+  (:method ((object store-object) (depth (eql 0)))
+            (slot-value object 'last-change))
+
+  (:method ((object store-object) depth)
+    (let ((last-change (slot-value object 'last-change)))
+      (dolist (slotd (class-slots (class-of object)))
+        (let* ((slot-name (slot-definition-name slotd))
+               (child (and (slot-boundp object slot-name)
+                           (slot-value object slot-name))))
+          (setf last-change
+                (cond
+                  ((null child)
+                   last-change)
+                  ((typep child 'store-object)
+                   (max last-change (store-object-last-change child (1- depth))))
+                  ((listp child)
+                   (reduce #'max child
+                           :key (alexandria:rcurry 'store-object-last-change (1- depth))
+                           :initial-value last-change))
+                  (t
+                   last-change)))))
+      last-change)))
 
 #+allegro
 (aclmop::finalize-inheritance (find-class 'store-object))

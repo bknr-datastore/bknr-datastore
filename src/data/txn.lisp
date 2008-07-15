@@ -236,6 +236,9 @@ want to change the store permanently."
   (or *current-transaction*
       (eq :restore (store-state *store*))))
 
+(defun current-transaction-timestamp ()
+  (transaction-timestamp *current-transaction*))
+
 (defun store-open-p ()
   (not (eq :closed (store-state *store*))))
 
