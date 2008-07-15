@@ -84,10 +84,13 @@ deleted, slot reads will return nil."
   (slot-value slot 'relaxed-object-reference))
 
 (defmethod (setf slot-value-using-class) :before (newval (class persistent-class) object slotd)
-  (when (and (persistent-slot-p slotd)
-	     (not (in-transaction-p)))
-    (error "Attempt to set persistent slot ~A of ~A outside of a transaction"
-	   (slot-definition-name slotd) object)))
+  (let ((slot-name (slot-definition-name slotd)))
+    (when (and (persistent-slot-p slotd)
+               (not (in-transaction-p)))
+      (error "Attempt to set persistent slot ~A of ~A outside of a transaction"
+             slot-name object))
+    (unless (eq 'last-change slot-name)
+      (setf (slot-value object 'last-change) (transaction-timestamp *current-transaction*)))))
 
 (defmethod (setf slot-value-using-class) :after (newval (class persistent-class) object slotd)
   (when (in-anonymous-transaction-p)
@@ -132,7 +135,9 @@ deleted, slot reads will return nil."
        :index-type unique-index
        :index-initargs (:test #'eql)
        :index-reader store-object-with-id :index-values all-store-objects
-       :index-mapvalues map-store-objects))
+       :index-mapvalues map-store-objects)
+   (last-change :initform (get-universal-time)
+                :initarg :last-change))
   (:metaclass persistent-class)
   (:class-indices (all-class :index-type class-skip-index
 			     :index-subclasses t
