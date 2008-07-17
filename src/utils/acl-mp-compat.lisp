@@ -17,7 +17,7 @@
   #+lispworks
   (mp:make-lock :name name))
 
-(defmacro mp-with-lock-held ((lock) &rest body)
+(defmacro mp-with-lock-held ((lock) &body body)
   #+allegro
   `(mp:with-process-lock (,lock)
     ,@body)
@@ -34,7 +34,7 @@
   `(mp:with-lock (,lock)
     ,@body))
 
-(defmacro mp-with-recursive-lock-held ((lock) &rest body)
+(defmacro mp-with-recursive-lock-held ((lock) &body body)
   #+allegro
   `(mp:with-process-lock (,lock)
     ,@body)
