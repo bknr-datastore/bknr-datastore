@@ -353,15 +353,15 @@ a snapshot."))
     (%encode-integer (store-object-id object) stream)
     (%encode-set-slots slots object stream)))
 
-(defvar *class-rename-hash*)
-
 (defun find-class-with-interactive-renaming (class-name)
-  (loop until (find-class class-name nil)
+  (loop until (or (null class-name)
+                  (find-class class-name nil))
 	do (progn
-	     (format *query-io* "Class ~A not found, enter new class: " class-name)
+	     (format *query-io* "Class ~A not found, enter new class or enter NIL to ignore objects of this class: " class-name)
 	     (finish-output *query-io*)
 	     (setq class-name (read *query-io*))))
-  (setf (gethash class-name *class-rename-hash*) (find-class class-name)))
+  (and class-name
+       (find-class class-name)))
 
 (defun find-slot-name-with-interactive-rename (class slot-name)
   (loop until (find slot-name (class-slots class) :key #'slot-definition-name)
@@ -406,20 +406,24 @@ a snapshot."))
          (class-name (%decode-symbol stream))
          (nslots (%decode-integer stream))
 	 (class (find-class-with-interactive-renaming class-name))
-         (slots (find-class-slots-with-interactive-renaming class (loop
-								   repeat nslots
-								   collect (%decode-symbol stream)))))
+         (slot-names (loop repeat nslots collect (%decode-symbol stream)))
+         (slots (if class
+                    (find-class-slots-with-interactive-renaming class slot-names)
+                    slot-names)))
     (setf (gethash id layouts)
           (cons class slots))))
 
 (defun %read-slots (stream object slots)
+  "Read the OBJECT from STREAM.  The individual slots of the object
+are expected in the order of the list SLOTS.  If the OBJECT is NIL,
+the slots are read from the snapshot and ignored."
   (declare (optimize (speed 3)))
   (dolist (slot-name slots)
-    (if slot-name			; NIL for slots which are not restored because of schema changes
+    (if slot-name ; NIL for slots which are not restored because of schema changes
 	(restart-case
 	    (let ((*current-object-slot* (list object slot-name))
-		  (*current-slot-relaxed-p*
-		   (store-object-relaxed-object-reference-p object slot-name)))
+		  (*current-slot-relaxed-p* (or (null object)
+                                                (store-object-relaxed-object-reference-p object slot-name))))
 	      (let ((value (decode stream)))
 		(when object
 		  (let ((bknr.indices::*indices-remove-p* nil))
@@ -437,30 +441,25 @@ a snapshot."))
 (defun snapshot-read-object (stream layouts)
   (declare (optimize (speed 3)))
   (with-simple-restart (skip-object "Skip the object.")
-    (let ((layout-id (%decode-integer stream))
-	  (object-id (%decode-integer stream)))
-      #+nil (format t "id: ~A~%" object-id)
-      (destructuring-bind (class &rest slots) (gethash layout-id layouts)
-	(declare (ignore slots))
-	#+nil (format t "; class: ~A~%" class)
-	(let ((result (make-instance class :id object-id)))
-	  result)))))
+    (let* ((layout-id (%decode-integer stream))
+           (object-id (%decode-integer stream))
+           (class (first (gethash layout-id layouts))))
+      ;; If the class is NIL, it was not found in the currently
+      ;; running Lisp image and objects of this class will be ignored.
+      (when class
+        (make-instance class :id object-id)))))
 
 (defun snapshot-read-slots (stream layouts)
   (let* ((layout-id (%decode-integer stream))
 	 (object-id (%decode-integer stream))
 	 (object (store-object-with-id object-id)))
     (restart-case
-	(progn
-	  #+nil (format t "read-slots for object ~A, id ~A~%" object object-id)
-	  (unless object
-	    (error "READ-SLOTS form for unexistent object with ID ~A~%" object-id))
-	  (%read-slots stream object (cdr (gethash layout-id layouts))))
-	(skip-object-initialization ()
-	  :report "Skip object initialization.")
-	(delete-object ()
-	  :report "Delete the object."
-	  (delete-object object)))))
+	(%read-slots stream object (cdr (gethash layout-id layouts)))
+      (skip-object-initialization ()
+        :report "Skip object initialization.")
+      (delete-object ()
+        :report "Delete the object."
+        (delete-object object)))))
 
 (defmethod encode-object ((object store-object) stream)
   (if (object-destroyed-p object)
@@ -563,7 +562,6 @@ a snapshot."))
 	      (created-objects 0)
 	      (read-slots 0)
 	      (error t)
-              (*class-rename-hash* (make-hash-table))
               (*slot-name-map* nil))
 	  (unwind-protect
 	       (progn
@@ -584,8 +582,8 @@ a snapshot."))
 			(format t "unknown char ~A at offset ~A~%" char (file-position s)))
 		      (ecase char
 			((nil) (return))
-			(#\O (snapshot-read-object s class-layouts) (incf created-objects))
 			(#\L (snapshot-read-layout s class-layouts))
+			(#\O (snapshot-read-object s class-layouts) (incf created-objects))
 			(#\S (snapshot-read-slots s class-layouts) (incf read-slots))))))
 		 (map-store-objects #'initialize-transient-instance)
 		 (setf error nil))
