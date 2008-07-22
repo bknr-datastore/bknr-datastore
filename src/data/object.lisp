@@ -41,7 +41,7 @@
   (let ((instance-count (length (class-instances class))))
     (when (plusp instance-count)
       (unless *suppress-schema-warnings*
-	(warn "updating ~A instances of ~A for class changes" instance-count class))
+	(format *trace-output* "~&; updating ~A instances of ~A for class changes~%" instance-count class))
       (mapc #'reinitialize-instance (class-instances class)))))
 
 (defmethod instance :after ((class persistent-class) &rest args)
