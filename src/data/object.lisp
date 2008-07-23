@@ -54,7 +54,7 @@
   (when (and (boundp '*store*) *store*)
     (update-instances-for-changed-class (class-name class))
     (unless *suppress-schema-warnings*
-      (format *trace-output* "Class ~A has been changed. To ensure correct schema evolution, please snapshot your datastore."
+      (format *trace-output* "~&; class ~A has been changed. To ensure correct schema evolution, please snapshot your datastore.~%"
               (class-name class)))))
 
 (defclass persistent-direct-slot-definition (index-direct-slot-definition)
@@ -554,7 +554,7 @@ the slots are read from the snapshot and ignored."
       (clear-class-indices (find-class class-name)))
     (setf (next-object-id subsystem) 0)
     (when (probe-file snapshot)
-      (format *trace-output* "loading snapshot file ~A~%" snapshot)
+      (format *trace-output* "~&; loading snapshot file ~A~%" snapshot)
       (with-open-file (s snapshot
 			 :element-type '(unsigned-byte 8)
 			 :direction :input)
