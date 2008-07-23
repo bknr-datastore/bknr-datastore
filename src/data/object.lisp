@@ -54,8 +54,8 @@
   (when (and (boundp '*store*) *store*)
     (update-instances-for-changed-class (class-name class))
     (unless *suppress-schema-warnings*
-      (warn "Class ~A has been changed. To ensure correct schema evolution, please snapshot your datastore."
-	    (class-name class)))))
+      (format *trace-output* "Class ~A has been changed. To ensure correct schema evolution, please snapshot your datastore."
+              (class-name class)))))
 
 (defclass persistent-direct-slot-definition (index-direct-slot-definition)
   ((transient :initarg :transient :initform nil)
