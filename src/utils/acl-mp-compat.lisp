@@ -55,17 +55,17 @@
 (error "missing port for this compiler, please provide for multiprocessing primitives for this compiler in ~A" *load-pathname*)
 
 (defun make-process (function &key name)
-  #+sbcl(sb-thread:make-thread function :name name)
-  #+openmcl(ccl:process-run-function name function)
-  #+cmu(mp:make-process function :name name))
+  #+sbcl (sb-thread:make-thread function :name name)
+  #+openmcl (ccl:process-run-function name function)
+  #+cmu (mp:make-process function :name name))
 
 (defun destroy-process (process)
-  #+sbcl(sb-thread:destroy-thread process)
-  #+openmcl(ccl:process-kill process)
-  #+cmu(mp:destroy-process process))
+  #+sbcl (sb-thread:destroy-thread process)
+  #+openmcl (ccl:process-kill process)
+  #+cmu (mp:destroy-process process))
 
 (defun process-active-p (process)
-  #+sbcl(sb-thread:thread-alive-p process)
-  #+openmcl(ccl::process-active-p process)
-  #+cmu(mp:process-active-p process))
+  #+sbcl (sb-thread:thread-alive-p process)
+  #+openmcl (ccl::process-active-p process)
+  #+cmu (mp:process-active-p process))
 

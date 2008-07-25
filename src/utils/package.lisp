@@ -6,7 +6,6 @@
         :cl-interpol
         :md5
         #+sbcl :sb-ext
-        #+cmu :mp
         #+openmcl :ccl)
   #+openmcl
   (:shadow :ccl #:copy-file #:make-process)
