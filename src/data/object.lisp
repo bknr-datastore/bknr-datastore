@@ -244,19 +244,19 @@ deleted, slot reads will return nil."
 			  :timestamp (get-universal-time)
 			  :args (append (list object (if (symbolp class) class (class-name class))) args))))
 
-(defgeneric initialize-persistent-instance (store-object)
+(defgeneric initialize-persistent-instance (store-object &key)
   (:documentation
-   "Initializes the persistent aspects of a persistent object. This method is called
-at the creationg of a persistent object, but not when the object is loaded from a
-snapshot."))
+   "Initializes the persistent aspects of a persistent object. This
+method is called at the creation of a persistent object, but not when
+the object is loaded from a snapshot."))
 
 (defgeneric initialize-transient-instance (store-object)
   (:documentation
-   "Initializes the transient aspects of a persistent object. This method is called
-whenever a persistent object is initialized, also when the object is loaded from
-a snapshot."))
+   "Initializes the transient aspects of a persistent object. This
+method is called whenever a persistent object is initialized, also
+when the object is loaded from a snapshot."))
 
-(defmethod initialize-persistent-instance ((object store-object)))
+(defmethod initialize-persistent-instance ((object store-object) &key))
 (defmethod initialize-transient-instance ((object store-object)))
 
 (defmethod store-object-persistent-slots ((object store-object))
@@ -641,7 +641,7 @@ the slots are read from the snapshot and ignored."
 			    (if restoring
 				(remove-transient-slot-initargs (find-class class-name) initargs)
 				initargs)))
-	   (initialize-persistent-instance obj)
+	   (apply #'initialize-persistent-instance obj initargs)
 	   (initialize-transient-instance obj)
 	   (setf error nil)
 	   obj)
