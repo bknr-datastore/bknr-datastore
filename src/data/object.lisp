@@ -381,7 +381,9 @@ a snapshot."))
   (:documentation "Generic function to be called to convert a slot's
   value from a previous snapshot layout.  OBJECT is the object that is
   being restored, SLOT-NAME is the name of the slot in the old schema,
-  VALUE is the value of the slot in the old schema."))
+  VALUE is the value of the slot in the old schema.")
+  (:method (object slot-name value)
+    (setf (slot-value object slot-name) value)))
 
 (defun find-slot-name-with-automatic-rename (class slot-name)
   (if (find slot-name (class-slots class) :key #'slot-definition-name)
@@ -445,9 +447,7 @@ the slots are read from the snapshot and ignored."
                  (let ((bknr.indices::*indices-remove-p* nil))
                    (if (eq value 'unbound)
                        (slot-makunbound object slot-name)
-                       (if (slot-boundp object slot-name)
-                           (convert-slot-value-while-restoring object slot-name value)
-                           (setf (slot-value object slot-name) value))))))
+                       (convert-slot-value-while-restoring object slot-name value)))))
            (set-slot-nil ()
              :report "Set slot to NIL."
              (setf (slot-value object slot-name) nil))
