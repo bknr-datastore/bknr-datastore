@@ -96,11 +96,11 @@ deleted, slot reads will return nil."
 
 (defmethod (setf slot-value-using-class) :after (newval (class persistent-class) object slotd)
   (when (in-anonymous-transaction-p)
-    (push (make-instance 'transaction
-                         :timestamp (get-universal-time)
-			 :function-symbol 'tx-change-slot-values
-			 :args (list object (slot-definition-name slotd) newval))
-	  (anonymous-transaction-transactions *current-transaction*))))
+    (encode (make-instance 'transaction
+                           :timestamp (get-universal-time)
+                           :function-symbol 'tx-change-slot-values
+                           :args (list object (slot-definition-name slotd) newval))
+            (anonymous-transaction-log-buffer *current-transaction*))))
 
 (defmethod direct-slot-definition-class ((class persistent-class) &key &allow-other-keys)
   'persistent-direct-slot-definition)
@@ -195,17 +195,17 @@ deleted, slot reads will return nil."
   (if (in-anonymous-transaction-p)
       (prog1
 	  (call-next-method)
-	(push (make-instance 'transaction
-			     :function-symbol 'make-instance
-			     :timestamp (get-universal-time)
-			     :args (cons (class-name (class-of object))
-					 (loop for slotd in (class-slots (class-of object))
-					    for slot-name = (slot-definition-name slotd)
-					    for slot-initarg = (first (slot-definition-initargs slotd))
-					    when (and slot-initarg
-						      (slot-boundp object slot-name))
-					    appending (list slot-initarg (slot-value object slot-name)))))
-	      (anonymous-transaction-transactions *current-transaction*)))
+	(encode (make-instance 'transaction
+                               :function-symbol 'make-instance
+                               :timestamp (get-universal-time)
+                               :args (cons (class-name (class-of object))
+                                           (loop for slotd in (class-slots (class-of object))
+                                              for slot-name = (slot-definition-name slotd)
+                                              for slot-initarg = (first (slot-definition-initargs slotd))
+                                              when (and slot-initarg
+                                                        (slot-boundp object slot-name))
+                                              appending (list slot-initarg (slot-value object slot-name)))))
+                (anonymous-transaction-log-buffer *current-transaction*)))
       (call-next-method)))
 
 (defmethod initialize-instance :after ((object store-object) &key id &allow-other-keys)
@@ -661,7 +661,8 @@ the slots are read from the snapshot and ignored."
   (destroy-object (store-object-with-id id)))
 
 (defun delete-object (object)
-  (if (in-transaction-p)
+  (if (and (in-transaction-p)
+           (not (in-anonymous-transaction-p)))
       (destroy-object object)
       (execute (make-instance 'transaction :function-symbol 'tx-delete-object
                               :timestamp (get-universal-time)

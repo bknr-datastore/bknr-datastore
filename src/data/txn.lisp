@@ -10,12 +10,66 @@
 (define-condition not-in-transaction (error)
   ()
   (:documentation
-   "Thrown when an operation on persistent slots is executed outside a transaction context"))
+   "Signaled when an operation on persistent slots is executed outside
+   a transaction context"))
 
 (define-condition store-not-open (error)
   ()
   (:documentation
-   "Thrown when a transaction is executed on a store that is not opened"))
+   "Signaled when a transaction is executed on a store that is not
+   opened"))
+
+(define-condition store-already-open (error)
+  ()
+  (:documentation
+   "Signaled when an attempt is made to open a store with another
+   store being open"))
+
+(define-condition invalid-store-random-state (error)
+  ()
+  (:documentation
+   "Signaled when the on-disk store random state cannot be read,
+   typically because it has been written with another Lisp"))
+
+(define-condition unsupported-lambda-list-option (error)
+  ((option :initarg :option :reader option))
+  (:documentation
+   "Signaled when DEFTRANSACTION is used with an unsupported option in
+   its lambda list"))
+
+(define-condition default-arguments-unsupported (error)
+  ((tx-name :initarg :tx-name :reader tx-name)
+   (argument :initarg :argument :reader argument))
+  (:report (lambda (c stream)
+             (format stream "argument ~A defaulted in DEFTRANSACTION ~S"
+                     (argument c) (tx-name c))))
+  (:documentation
+   "Signaled when an argument in a DEFTRANSACTION definition has a
+   default declaration"))
+
+(define-condition undefined-transaction (error)
+  ((tx-name :initarg :tx-name :reader tx-name))
+  (:report (lambda (c stream)
+             (format stream "undefined transaction ~A in transaction log, please ensure that all the necessary code is loaded."
+                     (tx-name c))))
+  (:documentation
+   "Signaled when a named transaction is loaded from the transaction
+   log and no matching function definition could be found"))
+
+(define-condition invalid-transaction-nesting (error)
+  ()
+  (:documentation
+   "Signaled when WITH-TRANSACTION forms are nested."))
+
+(define-condition anonymous-transaction-in-named-transaction (error)
+  ()
+  (:documentation
+   "Signaled when an anonymous transaction is started from within a named transaction."))
+
+(define-condition no-subsystems (error)
+  ()
+  (:documentation
+   "Signaled when an attempt is made to snapshot a store without subsystems"))
 
 ;;; store
 
@@ -74,7 +128,7 @@
     (restart-case
         (when (and (boundp '*store*)
                    *store*)
-          (error "A store is already opened."))
+          (error 'store-already-open))
       (close-store ()
         :report "Close the opened store."
         (close-store)))))
@@ -153,7 +207,7 @@
                       (read f)
                     (error (e)
                       (declare (ignore e))
-                      (error "Invalid store random state"))))
+                      (error 'invalid-store-random-state))))
           (initialize-store-random-state ()
             :report "Initialize the random state of the store.  Use
 this to reinitialize the random state of the store when porting over a
@@ -245,7 +299,7 @@ want to change the store permanently."
 (defun store-current-transaction ()
   (if (in-transaction-p)
       *current-transaction*
-      (error "store-current-transaction called outside of a transaction")))
+      (error 'not-in-transaction)))
 
 ;;; All transactions are executed by an 'executor', which is the store
 ;;; itself or, in the case of a nested transaction, the parent
@@ -262,7 +316,7 @@ want to change the store permanently."
 
 (defmethod execute-transaction :before (executor transaction)
   (unless (store-open-p)
-    (error (make-condition 'store-not-open))))
+    (error 'store-not-open)))
 
 (defmethod execute-transaction ((executor transaction) transaction)
   (execute-unlogged transaction))
@@ -317,7 +371,7 @@ itself,"
            (&optional)
            (&rest (setf args (cdr args))) ; skip argument, too
            (&key (setf in-keywords-p t))
-           (otherwise (error "unsupported lambda list option ~A in DEFTRANSACTION" arg))))
+           (otherwise (error 'unsupported-lambda-list-option :option arg))))
         (t
          (when in-keywords-p
            (push (intern (symbol-name arg) :keyword) result))
@@ -335,7 +389,7 @@ store."
         (body body))
     (dolist (arg args)
       (when (listp arg)
-        (error "can't have argument defaults in transaction declaration for transaction ~A, please implement a wrapper" name)))
+        (error 'default-arguments-unsupported :tx-name name :argument (car arg))))
     (let ((tx-name (intern (format nil "TX-~A" name)
                            (symbol-package name))))
       `(progn
@@ -408,8 +462,8 @@ to the log file in an atomic group"))
   (with-store-guard ()
     (let ((*current-transaction* transaction))
       (apply (or (symbol-function (transaction-function-symbol transaction))
-                 (error "Undefined transaction function ~A, please ensure that all the necessary code is loaded."
-                        (transaction-function-symbol transaction)))
+                 (error 'undefined-transaction
+                        :tx-name (transaction-function-symbol transaction)))
              (transaction-args transaction)))))
 
 (defun fsync (stream)
@@ -436,7 +490,7 @@ to the log file in an atomic group"))
   (check-type transaction symbol) ; otherwise care for multiple evaluation
   `(with-store-guard ()
      (when (in-transaction-p)
-       (error "can't open nested with-transaction-log blocks"))
+       (error 'invalid-transaction-nesting))
      (with-store-state (:transaction)
        (prog1
 	   (let ((*current-transaction* ,transaction))
@@ -472,37 +526,34 @@ transaction, if any."
 ;;; The actual writing to the transaction log is performed by the
 ;;; with-transaction macro.
 
-;;; An anonymous transaction has an optional label which is stored in
-;;; the transaction log in order to make the source code location where
+;;; An anonymous transaction has a label which is stored in the
+;;; transaction log in order to make the source code location where
 ;;; the actual transaction code lives identifieable.
 
 (defclass anonymous-transaction (transaction)
-  ((label :initarg :label :accessor anonymous-transaction-label)
-   (transactions :initarg :transactions :accessor anonymous-transaction-transactions))
-  (:default-initargs :transactions nil :label nil))
+  ((label :initarg :label
+          :accessor anonymous-transaction-label
+          :initform (error "missing label in anonymous transaction definition"))
+   (log-buffer :initarg :log-buffer
+               :accessor anonymous-transaction-log-buffer
+               :initform (flex:make-in-memory-output-stream))))
 
 (defmethod print-object ((transaction anonymous-transaction) stream)
   (print-unreadable-object (transaction stream :type t)
-    (format stream "~A ~A ~A"
+    (format stream "~A ~A (~A)"
 	    (format-date-time (transaction-timestamp transaction))
 	    (anonymous-transaction-label transaction)
-	    (anonymous-transaction-transactions transaction))))
+	    (class-name (class-of (anonymous-transaction-log-buffer transaction))))))
 
 (defmethod in-anonymous-transaction-p ()
   (subtypep (type-of *current-transaction*) 'anonymous-transaction))
 
 (defmethod encode-object ((transaction anonymous-transaction) stream)
-  (cond
-    ((anonymous-transaction-label transaction)
-     (%write-tag #\N stream)
-     (%encode-string (anonymous-transaction-label transaction) stream))
-    (t
-     (%write-tag #\G stream)))
-  (%encode-list (reverse (anonymous-transaction-transactions transaction)) stream))
-
-(defmethod decode-object ((tag (eql #\G)) stream)
-  (make-instance 'anonymous-transaction
-		 :transactions (%decode-list stream)))
+  (%write-tag #\N stream)
+  (%encode-string (anonymous-transaction-label transaction) stream)
+  (let ((subtxns (flex:get-output-stream-sequence (anonymous-transaction-log-buffer transaction))))
+    (%encode-integer (length subtxns) stream)
+    (write-sequence subtxns stream)))
 
 (defvar *txn-log-stream* nil
   "This variable is bound to the transaction log stream while loading
@@ -510,23 +561,19 @@ transaction, if any."
    the subtransactions from the log.")
 
 (defmethod decode-object ((tag (eql #\N)) stream)
-  ;; When decoding an anonymous transaction from the transaction log,
-  ;; we only read its name.  The subtransaction are not read here, but
-  ;; rather in EXECUTE-UNLOGGED below.  The reason for this is that we
-  ;; need to execute the subtransactions while reading them, as we'd
-  ;; otherwise not be able to properly deserialize references to
-  ;; objects that have been created within this anonymous transaction.
-
-  ;; Thus, while restoring, the TRANSACTIONS slot of the anonymous
-  ;; transaction object is not used.
-  (make-instance 'anonymous-transaction
-		 :label (%decode-string stream)))
+  (let* ((label (%decode-string stream))
+         (length (%decode-integer stream))
+         (buffer (make-array length :element-type '(unsigned-byte 8))))
+    (read-sequence buffer stream)
+    (make-instance 'anonymous-transaction
+                   :label label
+                   :log-buffer (flex:make-in-memory-input-stream buffer))))
 
 (defmacro with-transaction ((&optional label) &body body)
   (let ((txn (gensym)))
     `(progn
        (when (in-transaction-p) 
-	 (error "tried to start anonymous transaction while in a transaction"))
+	 (error 'anonymous-transaction-in-named-transaction))
        (let ((,txn (make-instance 'anonymous-transaction :label ,(if (symbolp label) (symbol-name label) label))))
 	 (with-transaction-log (,txn)
 	   ,@body)))))
@@ -537,15 +584,14 @@ transaction, if any."
   ;; subtransactions from the transaction log.
   (assert (eq :restore (store-state *store*)) ()
           "Unexpected store state ~A for EXECUTE-UNLOGGED on an anonymous transaction" (store-state *store*))
-  (let ((subtxns (%decode-integer *txn-log-stream*)))
-    (dotimes (i subtxns)
-      (execute-unlogged (decode *txn-log-stream*)))
-    (when (plusp subtxns)
-      ;; In order to maintain the previous on-disk format, we read the last cdr of the list
-      (assert (eq nil (decode *txn-log-stream*))))))
+  (let ((stream (anonymous-transaction-log-buffer transaction)))
+    (handler-case
+        (loop
+           (execute-unlogged (decode stream)))
+      (end-of-file ()))))
 
-(defmethod execute-transaction :after ((executor anonymous-transaction) transaction)
-  (push transaction (anonymous-transaction-transactions executor)))
+(defmethod execute-transaction :before ((executor anonymous-transaction) transaction)
+  (encode transaction (anonymous-transaction-log-buffer executor)))
 
 ;;; Subsystems
 
@@ -571,9 +617,9 @@ pathname until a non-existant directory name has been found."
 
 (defmethod snapshot-store ((store store))
   (unless (store-open-p)
-    (error (make-condition 'store-not-open)))
+    (error 'store-not-open))
   (when (null (store-subsystems store))
-    (error "Cannot snapshot store without subsystems..."))
+    (error 'no-subsystems))
   (ensure-store-current-directory store)
   (with-store-state (:read-only store)
     (with-store-guard ()
