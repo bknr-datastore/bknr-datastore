@@ -244,7 +244,7 @@ deleted, slot reads will return nil."
 			  :timestamp (get-universal-time)
 			  :args (append (list object (if (symbolp class) class (class-name class))) args))))
 
-(defgeneric initialize-persistent-instance (store-object &key)
+(defgeneric initialize-persistent-instance (store-object &key &allow-other-keys)
   (:documentation
    "Initializes the persistent aspects of a persistent object. This
 method is called at the creation of a persistent object, but not when
