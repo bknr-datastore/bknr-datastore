@@ -377,6 +377,12 @@ a snapshot."))
       (find (symbol-name slot-name)
 	    (mapcar #'slot-definition-name (class-slots class)) :key #'symbol-name :test #'equal)))
 
+(defgeneric convert-slot-value-while-restoring (object slot-name value)
+  (:documentation "Generic function to be called to convert a slot's
+  value from a previous snapshot layout.  OBJECT is the object that is
+  being restored, SLOT-NAME is the name of the slot in the old schema,
+  VALUE is the value of the slot in the old schema."))
+
 (defun find-slot-name-with-automatic-rename (class slot-name)
   (if (find slot-name (class-slots class) :key #'slot-definition-name)
       slot-name
@@ -390,6 +396,9 @@ a snapshot."))
 	      (t
 	       (error "can't find a slot in class ~A which matches the name ~A used in the store snapshot"
 		      (class-name class) slot-name))))
+        (convert-values ()
+          :report "Convert slot values using CONVERT-SLOT-VALUE-WHILE-RESTORING"
+          (cons 'convert-slot-values slot-name))
 	(ignore-slot ()
 	  :report "Ignore slot, discarding values found in the snapshot file"
 	  nil))))
@@ -419,24 +428,32 @@ are expected in the order of the list SLOTS.  If the OBJECT is NIL,
 the slots are read from the snapshot and ignored."
   (declare (optimize (speed 3)))
   (dolist (slot-name slots)
-    (if slot-name ; NIL for slots which are not restored because of schema changes
-	(restart-case
-	    (let ((*current-object-slot* (list object slot-name))
-		  (*current-slot-relaxed-p* (or (null object)
-                                                (store-object-relaxed-object-reference-p object slot-name))))
-	      (let ((value (decode stream)))
-		(when object
-		  (let ((bknr.indices::*indices-remove-p* nil))
-		    (if (eq value 'unbound)
-			(slot-makunbound object slot-name)
-			(setf (slot-value object slot-name) value))))))
-	  (set-slot-nil ()
-	    :report "Set slot to NIL."
-	    (setf (slot-value object slot-name) nil))
-	  (make-slot-unbound ()
-	    :report "Make slot unbound."
-	    (slot-makunbound object slot-name)))
-	(decode stream))))		; read and ignore value
+    (let ((value (decode stream)))
+      (cond
+        ((consp slot-name)
+         (assert (eq 'convert-slot-values (car slot-name)))
+         (convert-slot-value-while-restoring object (cdr slot-name) value))
+        ((null slot-name)
+         ;; ignore value
+         )
+        (t
+         (restart-case
+             (let ((*current-object-slot* (list object slot-name))
+                   (*current-slot-relaxed-p* (or (null object)
+                                                 (store-object-relaxed-object-reference-p object slot-name))))
+               (when object
+                 (let ((bknr.indices::*indices-remove-p* nil))
+                   (if (eq value 'unbound)
+                       (slot-makunbound object slot-name)
+                       (if (slot-boundp object slot-name)
+                           (convert-slot-value-while-restoring object slot-name value)
+                           (setf (slot-value object slot-name) value))))))
+           (set-slot-nil ()
+             :report "Set slot to NIL."
+             (setf (slot-value object slot-name) nil))
+           (make-slot-unbound ()
+             :report "Make slot unbound."
+             (slot-makunbound object slot-name))))))))
 
 (defun snapshot-read-object (stream layouts)
   (declare (optimize (speed 3)))
@@ -496,23 +513,30 @@ the slots are read from the snapshot and ignored."
     (%decode-store-object stream)))
 
 (defun %decode-store-object (stream)
-  ;; This is actually called in two contexts, when a slot-value is to be filled with a reference to a store object
-  ;; and when a list of store objects is read from the transaction log (%decode-list).  In the former case, references
-  ;; two deleted objects are accepted when the slot pointing to the object is marked as being a "relaxed-object-reference",
-  ;; in the latter case, no such information is available.  To ensure maximum restorability of transaction logs, object
-  ;; references stored in lists are always considered to be relaxed references, which means that references to deleted
-  ;; objects are restored as NIL.  Applications must be prepared to cope with NIL entries in such object lists (usually
+  ;; This is actually called in two contexts, when a slot-value is to
+  ;; be filled with a reference to a store object and when a list of
+  ;; store objects is read from the transaction log (%decode-list).
+  ;; In the former case, references two deleted objects are accepted
+  ;; when the slot pointing to the object is marked as being a
+  ;; "relaxed-object-reference", in the latter case, no such
+  ;; information is available.  To ensure maximum restorability of
+  ;; transaction logs, object references stored in lists are always
+  ;; considered to be relaxed references, which means that references
+  ;; to deleted objects are restored as NIL.  Applications must be
+  ;; prepared to cope with NIL entries in such object lists (usually
   ;; lists in slots).
   (let* ((id (%decode-integer stream))
 	 (object (or (store-object-with-id id)
-		     (warn "internal inconsistency during restore: can't find store object ~A in loaded store" id)))
+		     (warn "internal inconsistency during restore: can't find store object ~A in loaded store"
+                           id)))
 	 (container (first *current-object-slot*))
 	 (slot-name (second *current-object-slot*)))
     (cond (object object)
 
 	  ((or *current-slot-relaxed-p* (not container))
 	   (if container
-	       (warn "Reference to inexistent object with id ~A in relaxed slot ~A of object with class ~A with ID ~A."
+	       (warn "Reference to inexistent object with id ~A in relaxed slot ~A of object ~
+                      with class ~A with ID ~A."
 		     id slot-name (type-of container) (store-object-id container))
 	       (warn "Reference to inexistent object with id ~A from unnamed container, returning NIL." id))
 
@@ -521,7 +545,8 @@ the slots are read from the snapshot and ignored."
 	     (setf (next-object-id (store-object-subsystem)) (1+ id)))
 	   nil)
 	  
-	  (t (error "Reference to inexistent object with id ~A from slot ~A of object ~A with ID ~A." id slot-name (type-of container)
+	  (t (error "Reference to inexistent object with id ~A from slot ~A of object ~A with ID ~A."
+                    id slot-name (type-of container)
 		    (if container (store-object-id container) "unknown object"))))))
 
 (defmethod snapshot-subsystem ((store store) (subsystem store-object-subsystem))
