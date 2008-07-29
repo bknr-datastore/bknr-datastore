@@ -71,6 +71,8 @@
 	   #:store-object-remove-keywords
 	   #:store-object-set-keywords
 
+           #:convert-slot-value-while-restoring
+
 	   #:persistent-change-class
 
 	   #:map-class-instances
