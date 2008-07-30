@@ -47,7 +47,7 @@
 
 (defvar *tests* (make-hash-table))
 
-(defmacro define-datastore-test (name &body body)
+(defmacro define-datastore-test (name &rest body)
   `(setf (gethash ,name *tests*)
          (make-instance 'datastore-test-class
                         :unit :datastore
@@ -117,14 +117,6 @@
   (time (bknr.datastore::without-sync ()
           (map-store-objects #'delete-object)))
   (test-equal (all-store-objects) nil))
-
-(define-datastore-test :make-instance-in-anon-txn
-  (with-transaction ()
-    (make-instance 'store-object)))
-
-(define-datastore-test :make-object-in-anon-txn
-  (with-transaction ()
-    (make-object 'store-object)))
 
 (define-persistent-class parent ()
   ((child :update :initform nil)))

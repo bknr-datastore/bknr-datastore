@@ -458,13 +458,14 @@
 ;;; Persistent objects have the metaclass `PERSISTENT-CLASS', and have
 ;;; to be created using the function `MAKE-OBJECT'. This creates an
 ;;; instance of the object inside a transaction, sets its ID slot
-;;; appropriately, and then calls `INITIALIZE-TRANSIENT-INSTANCE'. The
-;;; standard CLOS function `INITIALIZE-INSTANCE' is called when the
-;;; object is created inside a transaction, but not if the object is
-;;; being restored from the snapshot file.
-;;; `INITIALIZE-TRANSIENT-INSTANCE' is called at object creation
-;;; inside a transaction and at object creation during restore. It
-;;; must be specialized to initialize the transient slots (not logged
+;;; appropriately, and then calls `INITIALIZE-PERSISTENT-INSTANCE' and
+;;; `INITIALIZE-TRANSIENT-INSTANCE'. The first method is called when
+;;; the object is created inside a transaction, but not if the object
+;;; is being restored from the snapshot file. This method has to be
+;;; overridden in order to initialize persistent
+;;; slots. `INITIALIZE-TRANSIENT-INSTANCE' is called at object
+;;; creation inside a transaction and at object creation during
+;;; restore. It is used to initialize the transient slots (not logged
 ;;; to the snapshot file) of a persistent object.
 ;;;
 ;;; We can define the following class with a transient and a
@@ -815,7 +816,9 @@ Function DECODE (STREAM) =<  OBJECT
 ;;; resolved (check the section about relaxed references). Finally,
 ;;; after each slot value has been set, the method
 ;;; `INITIALIZE-TRANSIENT-INSTANCE' is called for each created
-;;; object.
+;;; object. The method `INITIALIZE-PERSISTENT-INSTANCE' is not called,
+;;; as it has to be executed only once at the time the persistent
+;;; object is created.
 
 ;;;## Garbage collecting blobs
 
