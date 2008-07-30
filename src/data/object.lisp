@@ -454,9 +454,10 @@ the slots are read from the snapshot and ignored."
       ;; If the class is NIL, it was not found in the currently
       ;; running Lisp image and objects of this class will be ignored.
       (when class
+        (setf (next-object-id (store-object-subsystem)) object-id)
         (let ((object (allocate-instance class)))
+          (assert (= object-id (slot-value object 'id)))
           (dolist (index (class-slot-indices class 'id))
-            (assert (= object-id (slot-value object 'id)))
             (index-add index object)))))))
 
 (defun snapshot-read-slots (stream layouts)
@@ -641,12 +642,14 @@ the slots are read from the snapshot and ignored."
 
 (defun make-object (class-name &rest initargs)
   "Make a persistent object of class named CLASS-NAME. Calls MAKE-INSTANCE with INITARGS."
-  (with-store-guard ()
-    (execute (make-instance 'transaction
-                            :function-symbol 'tx-make-object
-                            :args (append (list class-name
-                                                :id (next-object-id (store-object-subsystem)))
-                                          initargs)))))
+  (if (in-anonymous-transaction-p)
+      (apply #'make-instance class-name initargs)
+      (with-store-guard ()
+        (execute (make-instance 'transaction
+                                :function-symbol 'tx-make-object
+                                :args (append (list class-name
+                                                    :id (next-object-id (store-object-subsystem)))
+                                              initargs))))))
 
 (defun tx-delete-object (id)
   (destroy-object (store-object-with-id id)))
