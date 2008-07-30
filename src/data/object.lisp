@@ -91,7 +91,7 @@ deleted, slot reads will return nil."
              slot-name object))
     (when (and (persistent-slot-p slotd)
                (not (eq :restore (store-state *store*)))
-               (not (eq 'last-change slot-name)))
+               (not (member slot-name '(last-change id))))
       (setf (slot-value object 'last-change) (current-transaction-timestamp)))))
 
 (defmethod (setf slot-value-using-class) :after (newval (class persistent-class) object slotd)
