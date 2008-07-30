@@ -22,12 +22,14 @@
                :unit-test
                :bknr.utils
                :bknr.indices
-               :trivial-utf-8)
+               :trivial-utf-8
+               :cl-json)
 
   :components ((:module "data" :components ((:file "package")
                                             (:file "encoding" :depends-on ("package"))
                                             (:file "txn" :depends-on ("encoding" "package"))
                                             (:file "object" :depends-on ("txn" "package"))
+                                            (:file "json" :depends-on ("object"))
                                             (:file "blob" :depends-on ("txn" "object" "package"))))))
 
 (defsystem :bknr.datastore.test  

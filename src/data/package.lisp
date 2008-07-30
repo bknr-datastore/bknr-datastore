@@ -116,6 +116,9 @@
            #:initialize-subsystem
            #:snapshot-subsystem
            #:restore-subsystem
-           #:ensure-store-current-directory))
+           #:ensure-store-current-directory
+
+           ;; JSON serialization
+           #:with-json-ignore-slots))
 
 
