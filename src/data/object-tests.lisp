@@ -45,25 +45,22 @@
     (call-next-method)
     (close-store)))
 
-(defvar *tests* (make-hash-table))
-
 (defmacro define-datastore-test (name &rest body)
-  `(setf (gethash ,name *tests*)
-         (make-instance 'datastore-test-class
-                        :unit :datastore
-                        :name ,name
-                        :body (lambda ()
-                                ,@body))))
+  `(make-instance 'datastore-test-class
+    :unit :datastore
+    :name ,name
+    :body (lambda ()
+            ,@body)))
 
-(define-datastore-test :store-setup
+(define-datastore-test "Datastore setup"
     (test-assert *test-datastore*))
 
-(define-datastore-test :create-object
+(define-datastore-test "Create object"
     (let ((obj (make-object 'store-object)))
       (test-assert obj)
       (test-equal (list obj) (all-store-objects))))
 
-(define-datastore-test :create-multiple-objects
+(define-datastore-test "Create multiple objects"
     (let ((o1 (make-object 'store-object))
 	  (o2 (make-object 'store-object)))
       (test-assert o1)
@@ -71,7 +68,7 @@
       (test-equal (length (all-store-objects)) 2)
       (test-assert (subsetp (list o1 o2) (all-store-objects)))))
 
-(define-datastore-test :delete-multiple-objects
+(define-datastore-test "Delete multiple objects"
     (let ((o1 (make-object 'store-object))
 	  (o2 (make-object 'store-object)))
       (test-assert o1)
@@ -83,23 +80,23 @@
       (delete-object o2)
       (test-equal (all-store-objects) nil)))
 
-(define-datastore-test :restore
+(define-datastore-test "Restore"
     (make-object 'store-object)
   (restore)
   (test-equal (length (all-store-objects)) 1))
 
-(define-datastore-test :snapshot-and-restore
+(define-datastore-test "Snapshot and Restore"
     (make-object 'store-object)
   (snapshot)
   (restore)
   (test-equal (length (all-store-objects)) 1))
 
-(define-datastore-test :restore-multiple-objects
+(define-datastore-test "Restore multiple objects"
     (dotimes (i 10) (make-object 'store-object))
   (restore)
   (test-equal (length (all-store-objects)) 10))
 
-(define-datastore-test :snapshot-restore-multiple-objects
+(define-datastore-test "Snapshot and Restore multiple objects"
     (dotimes (i 10) (make-object 'store-object))
   (snapshot)
   (restore)
@@ -107,7 +104,7 @@
 
 (defconstant +stress-size+ 10000)
 
-(define-datastore-test :stress-test
+(define-datastore-test "Stress test object creation"
     (format t "Creating ~a objects~%" +stress-size+)
   (time (bknr.datastore::without-sync ()
           (dotimes (i +stress-size+)
@@ -124,19 +121,10 @@
 (define-persistent-class child ()
   ())
 
-(define-datastore-test :serialize-circular-in-anon-txn
+(define-datastore-test "Serialize circular dependency in anonymous txn"
   (let ((parent (make-object 'parent)))
     (with-transaction (:circular)
       (setf (parent-child parent) (make-object 'child))))
   (restore)
   (test-equal (find-class 'child)
               (class-of (parent-child (first (class-instances 'parent))))))
-
-(define-datastore-test :delete-object-in-anon-txn
-  (let (object)
-    (with-transaction (:make)
-      (setf object (make-object 'child)))
-    (with-transaction (:delete)
-      (delete-object object))
-    (restore)
-    (test-assert (object-destroyed-p object))))
