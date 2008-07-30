@@ -190,35 +190,31 @@ deleted, slot reads will return nil."
 #+allegro
 (aclmop::finalize-inheritance (find-class 'store-object))
 
-(defmethod initialize-instance :around
-    ((object store-object) &key &allow-other-keys)
+(defmethod initialize-instance :around ((object store-object) &rest initargs &key)
   (if (in-anonymous-transaction-p)
       (prog1
 	  (call-next-method)
 	(encode (make-instance 'transaction
                                :function-symbol 'make-instance
                                :timestamp (get-universal-time)
-                               :args (cons (class-name (class-of object))
-                                           (loop for slotd in (class-slots (class-of object))
-                                              for slot-name = (slot-definition-name slotd)
-                                              for slot-initarg = (first (slot-definition-initargs slotd))
-                                              when (and slot-initarg
-                                                        (slot-boundp object slot-name))
-                                              appending (list slot-initarg (slot-value object slot-name)))))
+                               :args (cons (class-name (class-of object)) initargs))
                 (anonymous-transaction-log-buffer *current-transaction*)))
       (call-next-method)))
 
-(defmethod initialize-instance :after ((object store-object) &key id &allow-other-keys)
-  (let ((subsystem (store-object-subsystem)))
-    (cond (id
-	   ;; during restore, use the given ID
-	   (when (>= id (next-object-id subsystem))
-	     (setf (next-object-id subsystem) (1+ id))))
-	  (t
-	   ;; normal transaction: assign a new ID
-	   (setf id (next-object-id subsystem))
-	   (incf (next-object-id subsystem))
-	   (setf (slot-value object 'id) id)))))
+(defmethod allocate-instance :around ((class persistent-class) &key)
+  (let* ((object (call-next-method))
+         (subsystem (store-object-subsystem))
+         (id (next-object-id subsystem)))
+    (incf (next-object-id subsystem))
+    (setf (slot-value object 'id) id)
+    object))
+
+(defmethod initialize-instance :after ((object store-object) &key)
+  ;; This is called only when initially creating the (persistent)
+  ;; instance, not during restore.  During restore, the
+  ;; INITIALIZE-TRANSIENT-INSTANCE function is called after the
+  ;; snapshot has been read, but before running the transaction log.
+  (initialize-transient-instance object))
 
 (defmethod print-object ((object store-object) stream)
   (print-unreadable-object (object stream :type t)
@@ -244,19 +240,13 @@ deleted, slot reads will return nil."
 			  :timestamp (get-universal-time)
 			  :args (append (list object (if (symbolp class) class (class-name class))) args))))
 
-(defgeneric initialize-persistent-instance (store-object &key &allow-other-keys)
-  (:documentation
-   "Initializes the persistent aspects of a persistent object. This
-method is called at the creation of a persistent object, but not when
-the object is loaded from a snapshot."))
-
 (defgeneric initialize-transient-instance (store-object)
   (:documentation
    "Initializes the transient aspects of a persistent object. This
-method is called whenever a persistent object is initialized, also
-when the object is loaded from a snapshot."))
+method is called after a persistent object has been initialized, also
+when the object is loaded from a snapshot, but before reading the
+transaction log."))
 
-(defmethod initialize-persistent-instance ((object store-object) &key))
 (defmethod initialize-transient-instance ((object store-object)))
 
 (defmethod store-object-persistent-slots ((object store-object))
@@ -464,7 +454,10 @@ the slots are read from the snapshot and ignored."
       ;; If the class is NIL, it was not found in the currently
       ;; running Lisp image and objects of this class will be ignored.
       (when class
-        (make-instance class :id object-id)))))
+        (let ((object (allocate-instance class)))
+          (dolist (index (class-slot-indices class 'id))
+            (assert (= object-id (slot-value object 'id)))
+            (index-add index object)))))))
 
 (defun snapshot-read-slots (stream layouts)
   (let* ((layout-id (%decode-integer stream))
@@ -641,15 +634,13 @@ the slots are read from the snapshot and ignored."
 			    (if restoring
 				(remove-transient-slot-initargs (find-class class-name) initargs)
 				initargs)))
-	   (apply #'initialize-persistent-instance obj initargs)
-	   (initialize-transient-instance obj)
 	   (setf error nil)
 	   obj)
       (when (and error obj)
 	(destroy-object obj)))))
 
 (defun make-object (class-name &rest initargs)
-  "Make a persistent object of class named CLASS-NAME. Calls MAKE-INSTANCE with INITARGS."  
+  "Make a persistent object of class named CLASS-NAME. Calls MAKE-INSTANCE with INITARGS."
   (with-store-guard ()
     (execute (make-instance 'transaction
                             :function-symbol 'tx-make-object

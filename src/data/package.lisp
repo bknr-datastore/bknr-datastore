@@ -51,7 +51,6 @@
 	   #:cascade-delete-p
 	   #:cascading-delete-object
    
-	   #:initialize-persistent-instance
 	   #:initialize-transient-instance
 
 	   #:store-object-with-id
