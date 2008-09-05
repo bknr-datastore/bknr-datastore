@@ -716,12 +716,11 @@ to cascading deletes."
 (defun change-slot-values (object &rest slots-and-values)
   "This function is the deprecated way to set slots of persistent
    objects."
-  (declare (ignore slots-and-values))
   (warn "CHANGE-SLOT-VALUES is deprecated - use WITH-TRANSACTION and standard accessors!")
   (execute (make-instance 'transaction
                           :function-symbol 'tx-change-slot-values
                           :timestamp (get-universal-time)
-                          :args (list object))))
+                          :args (list* object slots-and-values))))
 
 (defmethod prepare-for-snapshot (object)
   nil)
