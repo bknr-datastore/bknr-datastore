@@ -19,4 +19,3 @@
         (princ #\: stream)
         (json:encode-json (slot-value object (closer-mop:slot-definition-name slotdef)) stream)))
     (princ #\} stream)))
-

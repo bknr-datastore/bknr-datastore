@@ -6,13 +6,13 @@
 
 (defclass blob (store-object)
   ((type :initarg :type
-	 :reader blob-type
-	 :reader blob-mime-type
-	 :index-type hash-index
-	 :index-initargs (:test #'equal)
-	 :index-reader blobs-with-type)
+         :reader blob-type
+         :reader blob-mime-type
+         :index-type hash-index
+         :index-initargs (:test #'equal)
+         :index-reader blobs-with-type)
    (timestamp :initarg :timestamp :reader blob-timestamp
-	      :initform (get-universal-time)))
+              :initform (get-universal-time)))
   (:metaclass persistent-class))
 
 #+nil
@@ -48,24 +48,24 @@ datastore root to ensure that the correct value is used later.")))
          (nblobs-pathname
           (make-pathname :name "n-blobs-per-directory" :defaults store-dir)))
     (if store-existed-p
-	(if (probe-file nblobs-pathname)
-	    (unless (eql (n-blobs-per-directory subsystem)
-			 (with-open-file (s nblobs-pathname)
-			   (read s)))
-	      (error "BLOB configuration file ~A disagrees with user configuration"
-		     nblobs-pathname))
-	    (progn
-	      (warn "Could not find stored number of blobs per directory, writing current value: ~S"
-		    (n-blobs-per-directory subsystem))
-	      (with-open-file (s nblobs-pathname :direction :output)
-		(write (n-blobs-per-directory subsystem) :stream s))))
+        (if (probe-file nblobs-pathname)
+            (unless (eql (n-blobs-per-directory subsystem)
+                         (with-open-file (s nblobs-pathname)
+                           (read s)))
+              (error "BLOB configuration file ~A disagrees with user configuration"
+                     nblobs-pathname))
+            (progn
+              (warn "Could not find stored number of blobs per directory, writing current value: ~S"
+                    (n-blobs-per-directory subsystem))
+              (with-open-file (s nblobs-pathname :direction :output)
+                (write (n-blobs-per-directory subsystem) :stream s))))
         (with-open-file (s nblobs-pathname :direction :output)
           (write (n-blobs-per-directory subsystem) :stream s)))))
 
 (defun blob-subsystem ()
   (or (find-if (lambda (subsystem)
-		 (typep subsystem 'blob-subsystem))
-	       (store-subsystems *store*))
+                 (typep subsystem 'blob-subsystem))
+               (store-subsystems *store*))
       (error "store ~A does not have a BLOB subsysten" *store*)))
 
 (defmethod initialize-instance :before ((blob blob) &rest args)
@@ -85,14 +85,14 @@ datastore root to ensure that the correct value is used later.")))
 
 (defmethod blob-pathname ((id integer))
   (ensure-directories-exist (merge-pathnames (blob-relative-pathname *store* id)
-					     (store-blob-root-pathname *store*)) :verbose t))
+                                             (store-blob-root-pathname *store*)) :verbose t))
 
 (defmethod blob-pathname ((blob blob))
   (blob-pathname (store-object-id blob)))
 
 (defmacro with-open-blob ((s blob &rest args) &rest body)
   `(with-open-file (,s (blob-pathname ,blob) ,@args)
-    ,@body))
+     ,@body))
 
 (defgeneric blob-size (blob))
 
@@ -104,7 +104,7 @@ datastore root to ensure that the correct value is used later.")))
 
 (defmethod blob-to-stream ((blob blob) out)
   (with-open-blob (in blob :direction :input
-		      :element-type '(unsigned-byte 8))
+                      :element-type '(unsigned-byte 8))
     (copy-stream in out)))
 
 (defgeneric blob-to-file (blob pathname))
@@ -117,26 +117,26 @@ datastore root to ensure that the correct value is used later.")))
 
 (defmethod blob-from-stream ((blob blob) in)
   (with-open-blob (out blob :direction :output
-		       :element-type '(unsigned-byte 8)
-		       :if-exists :overwrite
-		       :if-does-not-exist :create)
+                       :element-type '(unsigned-byte 8)
+                       :if-exists :overwrite
+                       :if-does-not-exist :create)
     (copy-stream in out)))
 
 (defgeneric blob-from-string (blob string))
 
 (defmethod blob-from-string ((blob blob) string)
   (with-open-blob (out blob :direction :output
-		       :if-exists :overwrite
-		       :if-does-not-exist :create)
+                       :if-exists :overwrite
+                       :if-does-not-exist :create)
     (write-string string out)))
 
 (defgeneric blob-from-array (blob array))
 
 (defmethod blob-from-array ((blob blob) in)
   (with-open-blob (out blob :direction :output
-		       :element-type '(unsigned-byte 8)
-		       :if-exists :overwrite
-		       :if-does-not-exist :create)
+                       :element-type '(unsigned-byte 8)
+                       :if-exists :overwrite
+                       :if-does-not-exist :create)
     (write-sequence in out)))
 
 (defgeneric blob-from-file (blob pathname))
@@ -148,7 +148,7 @@ datastore root to ensure that the correct value is used later.")))
 (defun make-blob-from-file (pathname &optional (class 'blob) &rest initargs)
   (unless (getf initargs :type)
     (setf (getf initargs :type)
-	  (pathname-type pathname)))
+          (pathname-type pathname)))
   (let ((blob (apply #'make-object class initargs)))
     (blob-from-file blob pathname)
     blob))
@@ -170,25 +170,25 @@ datastore root to ensure that the correct value is used later.")))
 
 (defun delete-orphaned-blob-files (&optional (cold-run t))
   (dolist (blob-pathname (directory (merge-pathnames (make-pathname :name :wild :directory '(:relative :wild-inferiors))
-						     (store-blob-root-pathname))))
+                                                     (store-blob-root-pathname))))
     (handler-case
-	(when (pathname-name blob-pathname)
-	  (let* ((object-id (parse-integer (pathname-name blob-pathname)))
-		 (object (find-store-object object-id)))
-	    (labels ((delete-orphan (pathname)
-		       (handler-case
-			   (if cold-run
-			       (format t "cold run, not deleting ~A~%" pathname)
-			       (delete-file pathname))
-			 (error (e)
-			   (warn "can't delete file ~A: ~A" pathname e)))))
-	      (cond
-		((null object)
-		 (format t "; file ~A does not have a corresponding blob object - deleted~%" blob-pathname)
-		 (delete-orphan blob-pathname))
-		((not (subtypep (type-of object) 'blob))
-		 (format t "; file ~A has an object id of an object which does not have a subtype of blob (~A) - deleted~%" blob-pathname (type-of object))
-		 (delete-orphan blob-pathname))))))
+        (when (pathname-name blob-pathname)
+          (let* ((object-id (parse-integer (pathname-name blob-pathname)))
+                 (object (find-store-object object-id)))
+            (labels ((delete-orphan (pathname)
+                       (handler-case
+                           (if cold-run
+                               (format t "cold run, not deleting ~A~%" pathname)
+                               (delete-file pathname))
+                         (error (e)
+                           (warn "can't delete file ~A: ~A" pathname e)))))
+              (cond
+                ((null object)
+                 (format t "; file ~A does not have a corresponding blob object - deleted~%" blob-pathname)
+                 (delete-orphan blob-pathname))
+                ((not (subtypep (type-of object) 'blob))
+                 (format t "; file ~A has an object id of an object which does not have a subtype of blob (~A) - deleted~%"
+                         blob-pathname (type-of object))
+                 (delete-orphan blob-pathname))))))
       (error (e)
-	(error "~A checking blob pathname ~A" e blob-pathname)))))
-
+        (error "~A checking blob pathname ~A" e blob-pathname)))))

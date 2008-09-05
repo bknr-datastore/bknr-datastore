@@ -8,12 +8,12 @@
   (with-open-file (in-a path-a :element-type '(unsigned-byte 8))
     (with-open-file (in-b path-b :element-type '(unsigned-byte 8))
       (loop
-	 for byte-a = (read-byte in-a nil nil)
-	 for byte-b = (read-byte in-b nil nil)
-	 while (or byte-a byte-b)
-	 unless (and byte-a byte-b (= byte-a byte-b))
-	 return nil
-	 finally (return t)))))
+         for byte-a = (read-byte in-a nil nil)
+         for byte-b = (read-byte in-b nil nil)
+         while (or byte-a byte-b)
+         unless (and byte-a byte-b (= byte-a byte-b))
+         return nil
+         finally (return t)))))
 
 (defun congruent-p (a b)
   "Are lisp value A and B (deeply) congruent?"
@@ -38,9 +38,9 @@
   (let ((options (arnesi:ensure-list name)))
     (destructuring-bind (name &key skip) options
       `(test:test ,name
-         ,(if skip
-              `(test:skip ,skip)
-              `(test:is (congruent-p ,value (copy-by-encoding ,value))))))))
+                  ,(if skip
+                       `(test:skip ,skip)
+                       `(test:is (congruent-p ,value (copy-by-encoding ,value))))))))
 
 (test-encoding list.1 '(1 2 3))
 (test-encoding list.len.30 (loop repeat 30 collect 'x))
@@ -98,32 +98,32 @@
 (test-encoding char.4 (code-char 255))
 
 (test:test char.random
-  (test:for-all ((char (test:gen-character)))
-    (test:is (char= char (copy-by-encoding char)))))
+           (test:for-all ((char (test:gen-character)))
+                         (test:is (char= char (copy-by-encoding char)))))
 
 ;; strings
 (test:test string.random
-  (test:for-all ((string (test:gen-string)))
-    (test:is (string= string (copy-by-encoding string)))))
+           (test:for-all ((string (test:gen-string)))
+                         (test:is (string= string (copy-by-encoding string)))))
 
 (test:test string.random.code-limited
-  (test:for-all ((string (test:gen-string :elements (test:gen-character :code-limit 10000))))
-    (test:is (string= string (copy-by-encoding string)))))
+           (test:for-all ((string (test:gen-string :elements (test:gen-character :code-limit 10000))))
+                         (test:is (string= string (copy-by-encoding string)))))
 
 (test:test string.decode-utf-8
-  (labels ((decode-string-from-octets (octets)
-             (flexi-streams:with-input-from-sequence (in octets)
-               (bknr.datastore::%decode-string in))))    
-    (test:is (string-equal "<=>" (decode-string-from-octets #(1 3 60 61 62))))
-    ;; #\? is the substitution char
-    (string-equal "<?>" (decode-string-from-octets #(1 3 60 188 62)))
-    ;; kilian 2008-03-20: the following for-all test failed on ccl,
-    ;; because the correct utf-8 sequence could produce a char-code
-    ;; above char-code-limit - bknr.datastore::%decode-string should
-    ;; throw an error in this case, but I dont know how to test this
-    ;; (test:for-all ((octets (test:gen-buffer)))
-    ;;       (test:finishes (decode-string-from-octets (concatenate 'vector (vector 1 (length octets)) octets))))
-    ))
+           (labels ((decode-string-from-octets (octets)
+                      (flexi-streams:with-input-from-sequence (in octets)
+                        (bknr.datastore::%decode-string in))))
+             (test:is (string-equal "<=>" (decode-string-from-octets #(1 3 60 61 62))))
+             ;; #\? is the substitution char
+             (string-equal "<?>" (decode-string-from-octets #(1 3 60 188 62)))
+             ;; kilian 2008-03-20: the following for-all test failed on ccl,
+             ;; because the correct utf-8 sequence could produce a char-code
+             ;; above char-code-limit - bknr.datastore::%decode-string should
+             ;; throw an error in this case, but I dont know how to test this
+             ;; (test:for-all ((octets (test:gen-buffer)))
+             ;;       (test:finishes (decode-string-from-octets (concatenate 'vector (vector 1 (length octets)) octets))))
+             ))
 
 ;; #+(or (and sbcl sb-unicode) lispworks clisp acl)
 ;; (progn
@@ -139,7 +139,7 @@
 
 
 (test-encoding vector.2 (make-array 5 :element-type 'fixnum
-                                    :initial-contents (list 1 2 3 4 5)))
+                                      :initial-contents (list 1 2 3 4 5)))
 
 (test-encoding vector.4 #*101101101110)
 (test-encoding vector.3
@@ -672,4 +672,3 @@
 ;;     (regression-test:do-tests))
 ;;   (when (probe-file *test-file*)
 ;;     (ignore-errors (delete-file *test-file*))))
-

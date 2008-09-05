@@ -107,7 +107,7 @@
 ;;;   } else {
 ;;;     n       %integer          Number of dimensions following
 ;;;     dims    %integer[n]       ARRAY-DIMENSIONS
-;;;   } 
+;;;   }
 ;;;
 ;;;   if (flags has bit 2 set) {
 ;;;     fp      %integer          fill-pointer
@@ -122,7 +122,7 @@
 ;;;; workaround
 
 (declaim (inline %read-char %write-char))
-(defun %read-char (stream)  
+(defun %read-char (stream)
   (code-char (%decode-uint32 stream)))
 
 (defun %write-char (char stream)
@@ -130,7 +130,7 @@
 
 ;;;; tags
 (declaim (inline %read-tag %write-tag))
-(defun %read-tag (stream &optional (eof-error-p t) eof-value)  
+(defun %read-tag (stream &optional (eof-error-p t) eof-value)
   (let ((b (read-byte stream eof-error-p -1)))
     (if (= b -1)
         eof-value
@@ -226,7 +226,7 @@
 (defun %encode-single-float (object stream)
   #+allegro
   (map nil #'(lambda (short)
-	       (%encode-int16 short stream))
+               (%encode-int16 short stream))
        (multiple-value-list (excl::single-float-to-shorts object)))
   #+cmu
   (%encode-int32 (kernel:single-float-bits object) stream)
@@ -242,18 +242,18 @@
 (defun %encode-double-float (object stream)
   #+cmucl
   (map nil #'(lambda (short)
-	       (%encode-int16 short stream))
+               (%encode-int16 short stream))
        (multiple-value-list (excl::double-float-to-shorts object)))
   #+cmu
   (progn (%encode-int32 (kernel:double-float-high-bits object) stream)
- 	 (%encode-int32 (kernel:double-float-low-bits object) stream))
+         (%encode-int32 (kernel:double-float-low-bits object) stream))
   #+openmcl
   (multiple-value-bind (hi lo) (ccl::double-float-bits object)
     (%encode-int32 hi stream)
     (%encode-int32 lo stream))
   #+sbcl
   (progn (%encode-int32 (sb-kernel:double-float-high-bits object) stream)
-	 (%encode-int32 (sb-kernel:double-float-low-bits object) stream)))
+         (%encode-int32 (sb-kernel:double-float-low-bits object) stream)))
 
 (defun encode-double-float (object stream)
   (%write-tag #\d stream)
@@ -348,10 +348,10 @@
            (octets-to-string (octets)
              (handler-case
                  (trivial-utf-8:utf-8-bytes-to-string octets)
-               (trivial-utf-8:utf-8-decoding-error ()                   
+               (trivial-utf-8:utf-8-decoding-error ()
                  (octets-to-string-safe octets)))))
     (let* ((n (%decode-integer stream))
-           (buffer (make-array n :element-type '(unsigned-byte 8))))    
+           (buffer (make-array n :element-type '(unsigned-byte 8))))
       (assert (= n (read-sequence buffer stream)))
       (octets-to-string buffer))))
 
@@ -383,7 +383,7 @@
 (defun %decode-single-float (stream)
   #+allegro
   (excl::shorts-to-single-float (%decode-uint16 stream)
-				(%decode-uint16 stream))
+                                (%decode-uint16 stream))
   #+cmu
   (kernel:make-single-float (%decode-sint32 stream))
   #+openmcl
@@ -394,18 +394,18 @@
 (defun %decode-double-float (stream)
   #+allegro
   (excl::shorts-to-double-float (%decode-uint16 stream)
-				(%decode-uint16 stream)
-				(%decode-uint16 stream)
-				(%decode-uint16 stream))
+                                (%decode-uint16 stream)
+                                (%decode-uint16 stream)
+                                (%decode-uint16 stream))
   #+cmu
   (kernel:make-double-float (%decode-sint32 stream)
                             (%decode-uint32 stream))
   #+openmcl
   (make-double-float (%decode-sint32 stream)
-		     (%decode-uint32 stream))
+                     (%decode-uint32 stream))
   #+sbcl
   (sb-kernel:make-double-float (%decode-sint32 stream)
-			       (%decode-uint32 stream)))
+                               (%decode-uint32 stream)))
 
 (defun %decode-array (stream)
   (let* ((element-type (%decode-symbol stream))
@@ -465,7 +465,7 @@
                                    0
                                    (ash 1 23)))
                        (expt 0.5 23))))
-	 (* sign (expt 2.0 expt) mant)))))
+         (* sign (expt 2.0 expt) mant)))))
 
 #+openmcl
 (defun make-double-float (hi lo)
@@ -474,16 +474,16 @@
     ((and (zerop hi) (zerop lo)) 0.0d0)
     ((and (= hi #x-80000000) (zerop lo)) -0.0d0)
     (t (let* ((bits (logior (ash hi 32) lo))
-	      (sign (ecase (ldb (byte 1 63) bits)
-		      (0  1.0d0)
-		      (1 -1.0d0)))
+              (sign (ecase (ldb (byte 1 63) bits)
+                      (0  1.0d0)
+                      (1 -1.0d0)))
               (iexpt (ldb (byte 11 52) bits))
-	      (expt (if (zerop iexpt)   ; denormalized
+              (expt (if (zerop iexpt)   ; denormalized
                         -1022
                         (- iexpt 1023)))
-	      (mant (* (logior (ldb (byte 52 0) bits)
-			       (if (zerop iexpt)
+              (mant (* (logior (ldb (byte 52 0) bits)
+                               (if (zerop iexpt)
                                    0
                                    (ash 1 52)))
-		       (expt 0.5d0 52))))
-	 (* sign (expt 2.0d0 expt) mant)))))
+                       (expt 0.5d0 52))))
+         (* sign (expt 2.0d0 expt) mant)))))

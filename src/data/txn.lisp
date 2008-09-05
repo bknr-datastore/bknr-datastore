@@ -23,41 +23,41 @@
 
 (defmacro with-store ((store &key) &body body)
   `(let ((*store* ,store))
-    ,@body))
+     ,@body))
 
 (defclass store ()
   ((directory :initarg :directory
-	      :accessor store-directory)
+              :accessor store-directory)
    (state :accessor store-state
-	  :initform :closed
-	  :documentation "State of the datastore, can be either :closed, :opened or :read-only")
+          :initform :closed
+          :documentation "State of the datastore, can be either :closed, :opened or :read-only")
    (transaction-log-stream :accessor store-transaction-log-stream :initform nil)
    (random-state :accessor store-random-state
-		 :initform nil)
+                 :initform nil)
    (guard :reader store-guard
-	  :initarg :guard)
+          :initarg :guard)
    (log-guard :reader store-log-guard
-	      :initarg :log-guard)
+              :initarg :log-guard)
    (subsystems :reader store-subsystems
-	       :initarg :subsystems)
+               :initarg :subsystems)
    (transaction-run-time :accessor store-transaction-run-time
-			 :initform 0
-			 :documentation "The total run time of all application transaction code since last snapshot"))
+                         :initform 0
+                         :documentation "The total run time of all application transaction code since last snapshot"))
   (:default-initargs
-      :guard #'funcall
+   :guard #'funcall
     :log-guard #'funcall
     :subsystems (list (make-instance 'store-object-subsystem))))
 
 (defclass mp-store (store)
   ()
   (:default-initargs :guard (let ((lock (mp-make-lock)))
-			      (lambda (thunk)
-				(mp-with-recursive-lock-held (lock)
-				  (funcall thunk))))
-                     :log-guard (let ((lock (mp-make-lock)))
-                                  (lambda (thunk)
-				    (mp-with-recursive-lock-held (lock)
-				      (funcall thunk)))))
+                              (lambda (thunk)
+                                (mp-with-recursive-lock-held (lock)
+                                  (funcall thunk))))
+    :log-guard (let ((lock (mp-make-lock)))
+                 (lambda (thunk)
+                   (mp-with-recursive-lock-held (lock)
+                     (funcall thunk)))))
   (:documentation
    "Store in which every transaction and operation is protected by a giant lock."))
 
@@ -118,9 +118,9 @@
 (defmacro with-store-state ((state &optional (store '*store*)) &rest body)
   (let ((old-state (gensym)))
     `(let ((,old-state (store-state ,store)))
-      (setf (store-state ,store) ,state)
-      (unwind-protect (progn ,@body)
-	(setf (store-state ,store) ,old-state)))))
+       (setf (store-state ,store) ,state)
+       (unwind-protect (progn ,@body)
+         (setf (store-state ,store) ,old-state)))))
 
 ;; datastore pathnames
 
@@ -128,8 +128,8 @@
   (:documentation "Returns the name of the current datastore directory."))
 
 (defmethod store-current-directory ((store store))
-   (merge-pathnames (make-pathname :directory '(:relative "current"))
-		    (store-directory store)))
+  (merge-pathnames (make-pathname :directory '(:relative "current"))
+                   (store-directory store)))
 
 (defmethod ensure-store-current-directory ((store store))
   (ensure-directories-exist (store-current-directory store)))
@@ -195,15 +195,15 @@ want to change the store permanently."
 
 (defgeneric close-transaction-log-stream (store))
 (defgeneric store-transaction-log-stream (store))
- 
+
 (defmethod store-transaction-log-stream :before ((store store))
   (with-slots (transaction-log-stream) store
     (unless transaction-log-stream
       (setf transaction-log-stream (open (store-transaction-log-pathname store)
                                          :element-type '(unsigned-byte 8)
-					 :direction :output
-					 :if-does-not-exist :create
-					 :if-exists :append
+                                         :direction :output
+                                         :if-does-not-exist :create
+                                         :if-exists :append
                                          #+openmcl :sharing #+openmcl :lock)))))
 
 (defmethod close-transaction-log-stream ((store store))
@@ -220,15 +220,15 @@ want to change the store permanently."
 
 (defclass transaction ()
   ((function-symbol :initarg :function-symbol
-		    :reader transaction-function-symbol
-		    :documentation
-		    "Symbol of the function called when executing the transaction")
+                    :reader transaction-function-symbol
+                    :documentation
+                    "Symbol of the function called when executing the transaction")
    (args :initarg :args
-	 :reader transaction-args
-	 :initform nil)
+         :reader transaction-args
+         :initform nil)
    (timestamp :initarg :timestamp
-	      :accessor transaction-timestamp
-	      :initform (get-universal-time))))
+              :accessor transaction-timestamp
+              :initform (get-universal-time))))
 
 (defvar *current-transaction* nil)
 
@@ -282,15 +282,15 @@ Skips over any declarations that precede the docstring.  See also CLHS
   "Given a function definition body, insert FORMS-TO-INSERT after all
 declarations and documentation in BODY."
   (loop for rest on body
-        for form = (car rest)
-        with decls
-        with doc
-        while (or (and (listp form) (eq 'declare (car form)))
-                  (and (not doc) (cdr rest) (stringp form)))
-        when (stringp form)
-        do (setf doc form)
-        do (push form decls)
-        finally (return-from insert-after-declarations (append (nreverse decls) forms-to-insert rest))))
+     for form = (car rest)
+     with decls
+     with doc
+     while (or (and (listp form) (eq 'declare (car form)))
+               (and (not doc) (cdr rest) (stringp form)))
+     when (stringp form)
+     do (setf doc form)
+     do (push form decls)
+     finally (return-from insert-after-declarations (append (nreverse decls) forms-to-insert rest))))
 
 (defun make-args (args)
   "Parse the lambda list ARGS, returning a list that contains the
@@ -339,19 +339,19 @@ store."
     (let ((tx-name (intern (format nil "TX-~A" name)
                            (symbol-package name))))
       `(progn
-        (defun ,tx-name ,args
-          ,@(insert-after-declarations body
-                                       '((unless (in-transaction-p)
-                                           (error 'not-in-transaction)))))
-        (defun ,name ,args
-          ,@(let ((doc (find-doc body)))
-                 (when doc (list (format nil "[Transaction function wrapper ~A invokes a store transaction]~%~A" name doc))))
-          ,@(let ((rest (member '&rest args)))
-                 (when rest `((declare (ignore ,(second rest))))))
-          (execute (make-instance 'transaction
-                                  :function-symbol ',tx-name
-                                  :timestamp (get-universal-time)
-                                  :args (list ,@(make-args args)))))))))
+         (defun ,tx-name ,args
+           ,@(insert-after-declarations body
+                                        '((unless (in-transaction-p)
+                                            (error 'not-in-transaction)))))
+         (defun ,name ,args
+           ,@(let ((doc (find-doc body)))
+                  (when doc (list (format nil "[Transaction function wrapper ~A invokes a store transaction]~%~A" name doc))))
+           ,@(let ((rest (member '&rest args)))
+                  (when rest `((declare (ignore ,(second rest))))))
+           (execute (make-instance 'transaction
+                                   :function-symbol ',tx-name
+                                   :timestamp (get-universal-time)
+                                   :args (list ,@(make-args args)))))))))
 
 (defmethod encode-object ((object transaction) stream)
   (%write-tag #\T stream)
@@ -361,16 +361,16 @@ store."
 
 (defmethod decode-object ((tag (eql #\T)) stream)
   (make-instance 'transaction
-    :function-symbol (%decode-symbol stream)
-    :timestamp (%decode-integer stream)
-    :args (%decode-list stream)))
+                 :function-symbol (%decode-symbol stream)
+                 :timestamp (%decode-integer stream)
+                 :args (%decode-list stream)))
 
 (defmethod print-object ((transaction transaction) stream)
   (print-unreadable-object (transaction stream :type t)
     (format stream "~A ~A ~{~A~^ ~}"
-	    (format-date-time (transaction-timestamp transaction))
-	    (transaction-function-symbol transaction)
-	    (transaction-args transaction))))
+            (format-date-time (transaction-timestamp transaction))
+            (transaction-function-symbol transaction)
+            (transaction-args transaction))))
 
 ;;; operations on transactions
 
@@ -385,24 +385,24 @@ to the log file in an atomic group"))
 (defmethod execute-unlogged :around ((transaction transaction))
   "Execute transaction unsafely, catching errors"
   (let (retval
-	(execution-time 0))
+        (execution-time 0))
     (tagbody
      again
        (restart-case
-	   (let ((start-time (get-internal-run-time))
-		 (*random-state* (store-random-state *store*)))
-	     (setf retval (call-next-method))
-	     (setf execution-time (- (get-internal-run-time) start-time)))
-	 (retry-transaction ()
-	   :report (lambda (stream) (format stream "Retry the transaction ~A." transaction))
-	   (go again))))
+           (let ((start-time (get-internal-run-time))
+                 (*random-state* (store-random-state *store*)))
+             (setf retval (call-next-method))
+             (setf execution-time (- (get-internal-run-time) start-time)))
+         (retry-transaction ()
+           :report (lambda (stream) (format stream "Retry the transaction ~A." transaction))
+           (go again))))
     (incf (store-transaction-run-time *store*) execution-time)
     retval))
 
 (defmethod execute-unlogged :before ((transaction transaction))
   (when *store-debug*
     (format t "executing transaction ~A at timestamp ~A~%" transaction
-	    (transaction-timestamp transaction))))
+            (transaction-timestamp transaction))))
 
 (defmethod execute-unlogged ((transaction transaction))
   (with-store-guard ()
@@ -439,13 +439,13 @@ to the log file in an atomic group"))
        (error "can't open nested with-transaction-log blocks"))
      (with-store-state (:transaction)
        (prog1
-	   (let ((*current-transaction* ,transaction))
-	     ,@body)
-	 (with-log-guard ()
-	   (let ((out (store-transaction-log-stream *store*)))
-	     (encode ,transaction out)
-	     (unless *disable-sync*
-	       (fsync out))))))))
+           (let ((*current-transaction* ,transaction))
+             ,@body)
+         (with-log-guard ()
+           (let ((out (store-transaction-log-stream *store*)))
+             (encode ,transaction out)
+             (unless *disable-sync*
+               (fsync out))))))))
 
 (defvar *transaction-statistics* (make-statistics-table))
 
@@ -460,9 +460,9 @@ the deftransaction macro and by subsystems.  Executes the
 transaction either with the store or with the currently active
 transaction, if any."
   (execute-transaction (if (in-transaction-p)
-			   *current-transaction*
-			   *store*)
-		       transaction))
+                           *current-transaction*
+                           *store*)
+                       transaction))
 
 ;;; anonymous transactions - During execution of such a transactions,
 ;;; nothing is written to a log.  After leaving the body of the
@@ -484,9 +484,9 @@ transaction, if any."
 (defmethod print-object ((transaction anonymous-transaction) stream)
   (print-unreadable-object (transaction stream :type t)
     (format stream "~A ~A ~A"
-	    (format-date-time (transaction-timestamp transaction))
-	    (anonymous-transaction-label transaction)
-	    (anonymous-transaction-transactions transaction))))
+            (format-date-time (transaction-timestamp transaction))
+            (anonymous-transaction-label transaction)
+            (anonymous-transaction-transactions transaction))))
 
 (defmethod in-anonymous-transaction-p ()
   (subtypep (type-of *current-transaction*) 'anonymous-transaction))
@@ -502,7 +502,7 @@ transaction, if any."
 
 (defmethod decode-object ((tag (eql #\G)) stream)
   (make-instance 'anonymous-transaction
-		 :transactions (%decode-list stream)))
+                 :transactions (%decode-list stream)))
 
 (defvar *txn-log-stream* nil
   "This variable is bound to the transaction log stream while loading
@@ -520,16 +520,16 @@ transaction, if any."
   ;; Thus, while restoring, the TRANSACTIONS slot of the anonymous
   ;; transaction object is not used.
   (make-instance 'anonymous-transaction
-		 :label (%decode-string stream)))
+                 :label (%decode-string stream)))
 
 (defmacro with-transaction ((&optional label) &body body)
   (let ((txn (gensym)))
     `(progn
-       (when (in-transaction-p) 
-	 (error "tried to start anonymous transaction while in a transaction"))
+       (when (in-transaction-p)
+         (error "tried to start anonymous transaction while in a transaction"))
        (let ((,txn (make-instance 'anonymous-transaction :label ,(if (symbolp label) (symbol-name label) label))))
-	 (with-transaction-log (,txn)
-	   ,@body)))))
+         (with-transaction-log (,txn)
+           ,@body)))))
 
 (defmethod execute-unlogged ((transaction anonymous-transaction))
   ;; EXECUTE-UNLOGGED is called for anonymous transactions only when
@@ -563,11 +563,11 @@ default, the current time stamp is used.  If that directory already
 exists, attach a dot and an incrementing number to the directory
 pathname until a non-existant directory name has been found."
   (loop with timetag = (timetag)
-        for i = nil then (if i (incf i) 1)
-        for directory = (merge-pathnames (make-pathname :directory (list :relative (format nil "~A~@[.~A~]" timetag i)))
-                                         (store-directory store))
-        unless (probe-file directory)
-        return directory))
+     for i = nil then (if i (incf i) 1)
+     for directory = (merge-pathnames (make-pathname :directory (list :relative (format nil "~A~@[.~A~]" timetag i)))
+                                      (store-directory store))
+     unless (probe-file directory)
+     return directory))
 
 (defmethod snapshot-store ((store store))
   (unless (store-open-p)
@@ -581,31 +581,31 @@ pathname until a non-existant directory name has been found."
         (let ((backup-directory (make-backup-directory store)))
           (close-transaction-log-stream store)
 
-	  ;; CMUCL will, dass das directory existiert, ACL nicht
-	  #+(or cmu sbcl)
-	  (ensure-directories-exist backup-directory)
+          ;; CMUCL will, dass das directory existiert, ACL nicht
+          #+(or cmu sbcl)
+          (ensure-directories-exist backup-directory)
 
-	  (when *store-debug*
-	    (warn "Backup of the datastore in ~A."
-		  backup-directory))
-	  (rename-file (store-current-directory store) backup-directory)
-	  (ensure-store-current-directory store)
+          (when *store-debug*
+            (warn "Backup of the datastore in ~A."
+                  backup-directory))
+          (rename-file (store-current-directory store) backup-directory)
+          (ensure-store-current-directory store)
 
           (let ((error t))
             (unwind-protect
                  (with-store-state (:snapshot)
-		   (update-store-random-state store)
-		   (dolist (subsystem (store-subsystems store))
-		       (when *store-debug*
-			 (format *trace-output* "Snapshotting subsystem ~A of ~A~%" subsystem store))
-		       (snapshot-subsystem store subsystem)
-		       (when *store-debug*
-			 (format *trace-output* "Successfully snapshotted ~A of ~A~%" subsystem store)))
+                   (update-store-random-state store)
+                   (dolist (subsystem (store-subsystems store))
+                     (when *store-debug*
+                       (format *trace-output* "Snapshotting subsystem ~A of ~A~%" subsystem store))
+                     (snapshot-subsystem store subsystem)
+                     (when *store-debug*
+                       (format *trace-output* "Successfully snapshotted ~A of ~A~%" subsystem store)))
                    (setf (store-transaction-run-time store) 0)
                    (setf error nil))
               (when error
-		(warn "Restoring backup ~A to current." backup-directory)
-		(rename-file backup-directory (store-current-directory store))))))))))
+                (warn "Restoring backup ~A to current." backup-directory)
+                (rename-file backup-directory (store-current-directory store))))))))))
 
 (defvar *show-transactions* nil)
 
@@ -613,11 +613,11 @@ pathname until a non-existant directory name has been found."
   (let ((backup (make-pathname :type "backup" :defaults pathname)))
     (format t "~&; creating log file backup: ~A~%" backup)
     (with-open-file (s pathname
-                     :element-type '(unsigned-byte 8)
-                     :direction :input)
-      (with-open-file (r backup
                        :element-type '(unsigned-byte 8)
-                       :direction :output)
+                       :direction :input)
+      (with-open-file (r backup
+                         :element-type '(unsigned-byte 8)
+                         :direction :output)
         (copy-stream s r))))
   (format t "~&; truncating transaction log at position ~D.~%" position)
   #+cmu
@@ -671,29 +671,28 @@ pathname until a non-existant directory name has been found."
     (setf (store-state store) :opened)
     (with-store-state (:restore)
       (with-store-guard ()
-	(with-log-guard ()
-	  (close-transaction-log-stream store)
-	  (let ((transaction-log (store-transaction-log-pathname store))
-		(error t))
-	  ;;; restore the subsystems
-	    (unwind-protect
-		 (progn
-		   ;; Subsystems may not do any persistent changes when restoring.
-		   (dolist (subsystem (store-subsystems store))
-		       ;;; check that UNTIL > snapshot date
-		     (when *store-debug*
-		       (format *trace-output* "Restoring the subsystem ~A of ~A~%" subsystem store))
-		     (restore-subsystem store subsystem :until until))
-		   (when (probe-file transaction-log)
-		     (format *trace-output* "loading transaction log ~A~%" transaction-log)
-		     (setf (store-transaction-run-time store) 0)
-		     (load-transaction-log transaction-log :until until))
-		   (setf error nil))
-	      (when error
-		(dolist (subsystem (store-subsystems store))
-		  (when *store-debug*
-		    (format *trace-output* "Closing the subsystem ~A of ~A~%"
-			  subsystem store))
-		  (close-subsystem store subsystem)
-		  (setf (store-state store) :closed))))))))))
-
+        (with-log-guard ()
+          (close-transaction-log-stream store)
+          (let ((transaction-log (store-transaction-log-pathname store))
+                (error t))
+;;; restore the subsystems
+            (unwind-protect
+                 (progn
+                   ;; Subsystems may not do any persistent changes when restoring.
+                   (dolist (subsystem (store-subsystems store))
+;;; check that UNTIL > snapshot date
+                     (when *store-debug*
+                       (format *trace-output* "Restoring the subsystem ~A of ~A~%" subsystem store))
+                     (restore-subsystem store subsystem :until until))
+                   (when (probe-file transaction-log)
+                     (format *trace-output* "loading transaction log ~A~%" transaction-log)
+                     (setf (store-transaction-run-time store) 0)
+                     (load-transaction-log transaction-log :until until))
+                   (setf error nil))
+              (when error
+                (dolist (subsystem (store-subsystems store))
+                  (when *store-debug*
+                    (format *trace-output* "Closing the subsystem ~A of ~A~%"
+                            subsystem store))
+                  (close-subsystem store subsystem)
+                  (setf (store-state store) :closed))))))))))

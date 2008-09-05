@@ -1,7 +1,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (or (find-package :bknr.datastore.tests)
       (defpackage :bknr.datastore.tests
-	(:use :cl :bknr.datastore :bknr.indices :unit-test))))
+        (:use :cl :bknr.datastore :bknr.indices :unit-test))))
 
 (in-package :bknr.datastore.tests)
 
@@ -9,25 +9,25 @@
   (when (probe-file pathname)
     #+cmu
     (loop for file in (directory pathname)
-	  when (pathname-name file)
-	  do (delete-file file)
-	  unless (pathname-name file)
-	  do (delete-directory file))
+       when (pathname-name file)
+       do (delete-file file)
+       unless (pathname-name file)
+       do (delete-directory file))
     #+allegro
     (excl:delete-directory-and-files pathname)
     #+cmu
     (unix:unix-rmdir (namestring pathname))
     #+sbcl
-    (loop for file in (directory 
-		       (merge-pathnames
-			(make-pathname 
-			 :name    :wild
-			 :type    :wild
-			 :version :wild
-			 )
-			pathname)) 
-	  when (pathname-name file) do (delete-file file)
-	  unless (pathname-name file) do (delete-directory file))
+    (loop for file in (directory
+                       (merge-pathnames
+                        (make-pathname
+                         :name    :wild
+                         :type    :wild
+                         :version :wild
+                         )
+                        pathname))
+       when (pathname-name file) do (delete-file file)
+       unless (pathname-name file) do (delete-directory file))
     #+sbcl
     (sb-posix:rmdir (namestring pathname))
     #+openmcl
@@ -47,10 +47,10 @@
 
 (defmacro define-datastore-test (name &rest body)
   `(make-instance 'datastore-test-class
-    :unit :datastore
-    :name ,name
-    :body (lambda ()
-            ,@body)))
+                  :unit :datastore
+                  :name ,name
+                  :body (lambda ()
+                          ,@body)))
 
 (define-datastore-test "Datastore setup"
     (test-assert *test-datastore*))
@@ -62,7 +62,7 @@
 
 (define-datastore-test "Create multiple objects"
     (let ((o1 (make-object 'store-object))
-	  (o2 (make-object 'store-object)))
+          (o2 (make-object 'store-object)))
       (test-assert o1)
       (test-assert o2)
       (test-equal (length (all-store-objects)) 2)
@@ -70,7 +70,7 @@
 
 (define-datastore-test "Delete multiple objects"
     (let ((o1 (make-object 'store-object))
-	  (o2 (make-object 'store-object)))
+          (o2 (make-object 'store-object)))
       (test-assert o1)
       (test-assert o2)
       (test-equal (length (all-store-objects)) 2)
@@ -122,9 +122,9 @@
   ())
 
 (define-datastore-test "Serialize circular dependency in anonymous txn"
-  (let ((parent (make-object 'parent)))
-    (with-transaction (:circular)
-      (setf (parent-child parent) (make-object 'child))))
+    (let ((parent (make-object 'parent)))
+      (with-transaction (:circular)
+        (setf (parent-child parent) (make-object 'child))))
   (restore)
   (test-equal (find-class 'child)
               (class-of (parent-child (first (class-instances 'parent))))))

@@ -19,7 +19,7 @@
 ;;;; das dann erstelle File muesste etwas kleiner sein.
 
 (in-package :bknr.datastore)
- 
+
 (defvar *layout-counter* 0)
 
 (defun convert-snapshot/encode-layout (class-name slots stream)
@@ -51,27 +51,27 @@
   (declare (optimize (speed 3)))
   (if (consp exp)
       (case (car exp)
-	(create-object
+        (create-object
          (destructuring-bind (class &rest initargs) (cdr exp)
            (loop with id = nil
-                 for (slot value) on initargs by #'cddr
-                 collect slot into slots
-                 collect (convert-snapshot/exp value out) into values
-                 do
-                 (when (eq slot :id)
-                   (setf id value))
-                 finally (convert-snapshot/create-object class id slots values out))))
-	(set-slots
-	 (destructuring-bind (obj &rest initargs) (cdr exp)
-	   (loop for (slot value) on initargs by #'cddr
-                 collect slot into slots
-                 collect (convert-snapshot/exp value out) into values
-                 finally (convert-snapshot/set-slots obj slots values out))))
-	(store-object-with-id
+              for (slot value) on initargs by #'cddr
+              collect slot into slots
+              collect (convert-snapshot/exp value out) into values
+              do
+              (when (eq slot :id)
+                (setf id value))
+              finally (convert-snapshot/create-object class id slots values out))))
+        (set-slots
+         (destructuring-bind (obj &rest initargs) (cdr exp)
+           (loop for (slot value) on initargs by #'cddr
+              collect slot into slots
+              collect (convert-snapshot/exp value out) into values
+              finally (convert-snapshot/set-slots obj slots values out))))
+        (store-object-with-id
          (let ((o (allocate-instance (find-class 'store-object))))
            (setf (slot-value o 'id) (second exp))
            o))
-	(t
+        (t
          (eval exp)))
       exp))
 
@@ -79,9 +79,9 @@
   (with-store-state (:restore)
     (with-open-file (in file)
       (with-open-file (out (make-pathname :type "new" :defaults file)
-		       :direction :output
-		       :element-type '(unsigned-byte 8))
-	(let ((*package* #.*package*))
-	  (loop for exp = (read in nil 'eof nil)
-	     until (eql exp 'eof)
-	     do (convert-snapshot/exp exp out)))))))
+                           :direction :output
+                           :element-type '(unsigned-byte 8))
+        (let ((*package* #.*package*))
+          (loop for exp = (read in nil 'eof nil)
+             until (eql exp 'eof)
+             do (convert-snapshot/exp exp out)))))))

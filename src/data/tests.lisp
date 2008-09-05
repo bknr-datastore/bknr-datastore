@@ -14,7 +14,7 @@
   (boese-tx))
 
 (make-instance 'mp-store :directory "/tmp/spackstore/"
-	       :subsystems (list (make-instance 'store-object-subsystem)))
+                         :subsystems (list (make-instance 'store-object-subsystem)))
 
 (defmethod reinitialize-instance :around ((class persistent-class) &rest args)
   (declare (ignore args))
@@ -39,5 +39,3 @@
 (define-persistent-class foobar ()
   ((a :read :index-type unique-index :index-values all-foobars)
    (b :read :initform t)))
-
-
