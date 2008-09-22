@@ -426,10 +426,8 @@ also index subclasses of the class to which the slot belongs, default is T")
   (map nil #'index-clear (index-effective-slot-definition-indices slot)))
 
 (defmethod class-slot-indices ((class indexed-class) slot-name)
-  (let* ((slots (class-slots class))
-	 (slot (find slot-name slots :key #'slot-definition-name)))
-    (when slot
-      (index-effective-slot-definition-indices slot))))
+  (index-effective-slot-definition-indices (find slot-name (class-slots class)
+                                                 :key #'slot-definition-name)))
 
 (defmethod class-slot-index ((class indexed-class) slot-name)
   (let ((holder (find-if #'(lambda (holder) (and (eql (index-holder-class holder) class)
@@ -438,7 +436,7 @@ also index subclasses of the class to which the slot belongs, default is T")
     (when holder
       (index-holder-index holder))))
 	
-;;; destroy object mechanik
+;;; destroy object mechanic
 
 (defgeneric destroy-object-with-class (class object))
 (defgeneric destroy-object (object)

@@ -73,7 +73,7 @@ datastore root to ensure that the correct value is used later.")))
   (unless (blob-subsystem)
     (error "Can't create a BLOB in a datastore without BLOB subsystem.")))
 
-(defmethod blob-relative-pathname (store id)
+(defmethod blob-relative-pathname (id)
   (let ((n-files (n-blobs-per-directory (blob-subsystem))))
     (if n-files
         (make-pathname
@@ -84,7 +84,7 @@ datastore root to ensure that the correct value is used later.")))
 (defgeneric blob-pathname (blob-or-blob-id))
 
 (defmethod blob-pathname ((id integer))
-  (ensure-directories-exist (merge-pathnames (blob-relative-pathname *store* id)
+  (ensure-directories-exist (merge-pathnames (blob-relative-pathname id)
                                              (store-blob-root-pathname *store*)) :verbose t))
 
 (defmethod blob-pathname ((blob blob))
@@ -149,7 +149,7 @@ datastore root to ensure that the correct value is used later.")))
   (unless (getf initargs :type)
     (setf (getf initargs :type)
           (pathname-type pathname)))
-  (let ((blob (apply #'make-object class initargs)))
+  (let ((blob (apply #'make-instance class initargs)))
     (blob-from-file blob pathname)
     blob))
 

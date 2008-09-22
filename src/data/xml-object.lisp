@@ -32,7 +32,7 @@
   ())
 
 (defmethod bknr.impex::create-instance ((importer persistent-xml-class-importer) class-name &rest initforms)
-  (apply #'make-object class-name initforms))
+  (apply #'make-instance class-name initforms))
 
 (defmethod bknr.impex::set-slot-value ((handler persistent-xml-class-importer) object slot-name value)
   (change-slot-values object slot-name value))

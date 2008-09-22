@@ -7,15 +7,88 @@
 
 ;;; conditions
 
-(define-condition not-in-transaction (error)
-  ()
-  (:documentation
-   "Thrown when an operation on persistent slots is executed outside a transaction context"))
+(define-condition store-error (error)
+  ())
 
-(define-condition store-not-open (error)
+(define-condition not-in-transaction (store-error)
   ()
   (:documentation
-   "Thrown when a transaction is executed on a store that is not opened"))
+   "Signaled when an operation on persistent slots is executed outside
+   a transaction context"))
+
+(define-condition store-not-open (store-error)
+  ()
+  (:documentation
+   "Signaled when a transaction is executed on a store that is not
+   opened"))
+
+(define-condition store-already-open (store-error)
+  ()
+  (:documentation
+   "Signaled when an attempt is made to open a store with another
+   store being open"))
+
+(define-condition invalid-store-random-state (store-error)
+  ()
+  (:documentation
+   "Signaled when the on-disk store random state cannot be read,
+   typically because it has been written with another Lisp"))
+
+(define-condition unsupported-lambda-list-option (store-error)
+  ((option :initarg :option :reader option))
+  (:documentation
+   "Signaled when DEFTRANSACTION is used with an unsupported option in
+   its lambda list"))
+
+(define-condition default-arguments-unsupported (store-error)
+  ((tx-name :initarg :tx-name :reader tx-name)
+   (argument :initarg :argument :reader argument))
+  (:report (lambda (c stream)
+             (format stream "argument ~A defaulted in DEFTRANSACTION ~S"
+                     (argument c) (tx-name c))))
+  (:documentation
+   "Signaled when an argument in a DEFTRANSACTION definition has a
+   default declaration"))
+
+(define-condition undefined-transaction (store-error)
+  ((tx-name :initarg :tx-name :reader tx-name))
+  (:report (lambda (c stream)
+             (format stream "undefined transaction ~A in transaction log, please ensure that all the necessary code is loaded."
+                     (tx-name c))))
+  (:documentation
+   "Signaled when a named transaction is loaded from the transaction
+   log and no matching function definition could be found"))
+
+(define-condition invalid-transaction-nesting (store-error)
+  ()
+  (:documentation
+   "Signaled when WITH-TRANSACTION forms are nested."))
+
+(define-condition anonymous-transaction-in-named-transaction (store-error)
+  ()
+  (:documentation
+   "Signaled when an anonymous transaction is started from within a named transaction."))
+
+(define-condition no-subsystems (store-error)
+  ()
+  (:documentation
+   "Signaled when an attempt is made to snapshot a store without subsystems"))
+
+(define-condition invalid-environment-access (store-error)
+  ((function :initarg function))
+  (:report (lambda (e stream)
+             (with-slots (function) e
+               (format stream "A transaction function attempted to access the function ~A which ~
+                               would make execution of the transaction non-repeatable."
+                       function)))))
+
+;;; Verbose progress reporting of store operations
+
+(defvar *store-verbose* t)
+
+(defun report-progress (fmt &rest args)
+  (when *store-verbose*
+    (apply #'format *trace-output* fmt args)))
 
 ;;; store
 
@@ -74,7 +147,7 @@
     (restart-case
         (when (and (boundp '*store*)
                    *store*)
-          (error "A store is already opened."))
+          (error 'store-already-open))
       (close-store ()
         :report "Close the opened store."
         (close-store)))))
@@ -89,7 +162,7 @@
       (ensure-store-current-directory store)
       (dolist (subsystem (store-subsystems store))
         (when *store-debug*
-          (format *trace-output* "Initializing subsystem ~A of ~A~%" subsystem store))
+          (report-progress "Initializing subsystem ~A of ~A~%" subsystem store))
         (initialize-subsystem subsystem store store-existed-p))
       (restore-store store))
     (setf (store-state store) :opened)))
@@ -140,7 +213,7 @@
 (defun initialize-store-random-state (store)
   (with-open-file (f (store-random-state-pathname store)
                      :direction :output :if-does-not-exist :create :if-exists :supersede)
-    (format t "initializing store random state~%")
+    (report-progress "initializing store random state~%")
     (with-standard-io-syntax
       (prin1 (setf (store-random-state store) (make-random-state t)) f))))
 
@@ -153,7 +226,7 @@
                       (read f)
                     (error (e)
                       (declare (ignore e))
-                      (error "Invalid store random state"))))
+                      (error 'invalid-store-random-state))))
           (initialize-store-random-state ()
             :report "Initialize the random state of the store.  Use
 this to reinitialize the random state of the store when porting over a
@@ -245,7 +318,7 @@ want to change the store permanently."
 (defun store-current-transaction ()
   (if (in-transaction-p)
       *current-transaction*
-      (error "store-current-transaction called outside of a transaction")))
+      (error 'not-in-transaction)))
 
 ;;; All transactions are executed by an 'executor', which is the store
 ;;; itself or, in the case of a nested transaction, the parent
@@ -258,14 +331,14 @@ want to change the store permanently."
 ;;; nested transactions which are called are explicitly logged.
 
 (defgeneric execute-transaction (executor transaction)
-  (:documentation "Execute TRANSACTION on EXECUTOR (which may be a store or a transaction scope)."))
+  (:documentation "Execute TRANSACTION on EXECUTOR (which may be a store or a transaction scope).")
 
-(defmethod execute-transaction :before (executor transaction)
-  (unless (store-open-p)
-    (error (make-condition 'store-not-open))))
+  (:method :before ((executor t) (transaction t))
+           (unless (store-open-p)
+             (error 'store-not-open)))
 
-(defmethod execute-transaction ((executor transaction) transaction)
-  (execute-unlogged transaction))
+  (:method ((executor transaction) transaction)
+    (execute-unlogged transaction)))
 
 (defun find-doc (body)
   "Given a function definition BODY, extract the docstring, if any.
@@ -317,7 +390,7 @@ itself,"
            (&optional)
            (&rest (setf args (cdr args))) ; skip argument, too
            (&key (setf in-keywords-p t))
-           (otherwise (error "unsupported lambda list option ~A in DEFTRANSACTION" arg))))
+           (otherwise (error 'unsupported-lambda-list-option :option arg))))
         (t
          (when in-keywords-p
            (push (intern (symbol-name arg) :keyword) result))
@@ -335,7 +408,7 @@ store."
         (body body))
     (dolist (arg args)
       (when (listp arg)
-        (error "can't have argument defaults in transaction declaration for transaction ~A, please implement a wrapper" name)))
+        (error 'default-arguments-unsupported :tx-name name :argument (car arg))))
     (let ((tx-name (intern (format nil "TX-~A" name)
                            (symbol-package name))))
       `(progn
@@ -389,10 +462,10 @@ to the log file in an atomic group"))
     (tagbody
      again
        (restart-case
-           (let ((start-time (get-internal-run-time))
+           (let ((start-time (common-lisp::get-internal-run-time))
                  (*random-state* (store-random-state *store*)))
              (setf retval (call-next-method))
-             (setf execution-time (- (get-internal-run-time) start-time)))
+             (setf execution-time (- (common-lisp::get-internal-run-time) start-time)))
          (retry-transaction ()
            :report (lambda (stream) (format stream "Retry the transaction ~A." transaction))
            (go again))))
@@ -401,15 +474,15 @@ to the log file in an atomic group"))
 
 (defmethod execute-unlogged :before ((transaction transaction))
   (when *store-debug*
-    (format t "executing transaction ~A at timestamp ~A~%" transaction
-            (transaction-timestamp transaction))))
+    (report-progress "executing transaction ~A at timestamp ~A~%" transaction
+                     (transaction-timestamp transaction))))
 
 (defmethod execute-unlogged ((transaction transaction))
   (with-store-guard ()
     (let ((*current-transaction* transaction))
       (apply (or (symbol-function (transaction-function-symbol transaction))
-                 (error "Undefined transaction function ~A, please ensure that all the necessary code is loaded."
-                        (transaction-function-symbol transaction)))
+                 (error 'undefined-transaction
+                        :tx-name (transaction-function-symbol transaction)))
              (transaction-args transaction)))))
 
 (defun fsync (stream)
@@ -436,7 +509,7 @@ to the log file in an atomic group"))
   (check-type transaction symbol) ; otherwise care for multiple evaluation
   `(with-store-guard ()
      (when (in-transaction-p)
-       (error "can't open nested with-transaction-log blocks"))
+       (error 'invalid-transaction-nesting))
      (with-store-state (:transaction)
        (prog1
            (let ((*current-transaction* ,transaction))
@@ -477,28 +550,29 @@ transaction, if any."
 ;;; the actual transaction code lives identifieable.
 
 (defclass anonymous-transaction (transaction)
-  ((label :initarg :label :accessor anonymous-transaction-label)
-   (transactions :initarg :transactions :accessor anonymous-transaction-transactions))
-  (:default-initargs :transactions nil :label nil))
+  ((label :initarg :label
+          :accessor anonymous-transaction-label
+          :initform (error "missing label in anonymous transaction definition"))
+   (log-buffer :initarg :log-buffer
+               :accessor anonymous-transaction-log-buffer
+               :initform (flex:make-in-memory-output-stream))))
 
 (defmethod print-object ((transaction anonymous-transaction) stream)
   (print-unreadable-object (transaction stream :type t)
-    (format stream "~A ~A ~A"
+    (format stream "~A ~A (~A)"
             (format-date-time (transaction-timestamp transaction))
             (anonymous-transaction-label transaction)
-            (anonymous-transaction-transactions transaction))))
+            (class-name (class-of (anonymous-transaction-log-buffer transaction))))))
 
 (defmethod in-anonymous-transaction-p ()
   (subtypep (type-of *current-transaction*) 'anonymous-transaction))
 
 (defmethod encode-object ((transaction anonymous-transaction) stream)
-  (cond
-    ((anonymous-transaction-label transaction)
-     (%write-tag #\N stream)
-     (%encode-string (anonymous-transaction-label transaction) stream))
-    (t
-     (%write-tag #\G stream)))
-  (%encode-list (reverse (anonymous-transaction-transactions transaction)) stream))
+  (%write-tag #\N stream)
+  (%encode-string (anonymous-transaction-label transaction) stream)
+  (let ((subtxns (flex:get-output-stream-sequence (anonymous-transaction-log-buffer transaction))))
+    (%encode-integer (length subtxns) stream)
+    (write-sequence subtxns stream)))
 
 (defmethod decode-object ((tag (eql #\G)) stream)
   (make-instance 'anonymous-transaction
@@ -510,23 +584,19 @@ transaction, if any."
    the subtransactions from the log.")
 
 (defmethod decode-object ((tag (eql #\N)) stream)
-  ;; When decoding an anonymous transaction from the transaction log,
-  ;; we only read its name.  The subtransaction are not read here, but
-  ;; rather in EXECUTE-UNLOGGED below.  The reason for this is that we
-  ;; need to execute the subtransactions while reading them, as we'd
-  ;; otherwise not be able to properly deserialize references to
-  ;; objects that have been created within this anonymous transaction.
-
-  ;; Thus, while restoring, the TRANSACTIONS slot of the anonymous
-  ;; transaction object is not used.
-  (make-instance 'anonymous-transaction
-                 :label (%decode-string stream)))
+  (let* ((label (%decode-string stream))
+         (length (%decode-integer stream))
+         (buffer (make-array length :element-type '(unsigned-byte 8))))
+    (read-sequence buffer stream)
+    (make-instance 'anonymous-transaction
+                   :label label
+                   :log-buffer (flex:make-in-memory-input-stream buffer))))
 
 (defmacro with-transaction ((&optional label) &body body)
   (let ((txn (gensym)))
     `(progn
        (when (in-transaction-p)
-         (error "tried to start anonymous transaction while in a transaction"))
+ 	 (error 'anonymous-transaction-in-named-transaction))
        (let ((,txn (make-instance 'anonymous-transaction :label ,(if (symbolp label) (symbol-name label) label))))
          (with-transaction-log (,txn)
            ,@body)))))
@@ -537,15 +607,14 @@ transaction, if any."
   ;; subtransactions from the transaction log.
   (assert (eq :restore (store-state *store*)) ()
           "Unexpected store state ~A for EXECUTE-UNLOGGED on an anonymous transaction" (store-state *store*))
-  (let ((subtxns (%decode-integer *txn-log-stream*)))
-    (dotimes (i subtxns)
-      (execute-unlogged (decode *txn-log-stream*)))
-    (when (plusp subtxns)
-      ;; In order to maintain the previous on-disk format, we read the last cdr of the list
-      (assert (eq nil (decode *txn-log-stream*))))))
+  (let ((stream (anonymous-transaction-log-buffer transaction)))
+    (handler-case
+        (loop
+           (execute-unlogged (decode stream)))
+      (end-of-file ()))))
 
-(defmethod execute-transaction :after ((executor anonymous-transaction) transaction)
-  (push transaction (anonymous-transaction-transactions executor)))
+(defmethod execute-transaction :before ((executor anonymous-transaction) transaction)
+  (encode transaction (anonymous-transaction-log-buffer executor)))
 
 ;;; Subsystems
 
@@ -571,9 +640,9 @@ pathname until a non-existant directory name has been found."
 
 (defmethod snapshot-store ((store store))
   (unless (store-open-p)
-    (error (make-condition 'store-not-open)))
+    (error 'store-not-open))
   (when (null (store-subsystems store))
-    (error "Cannot snapshot store without subsystems..."))
+    (error 'no-subsystems))
   (ensure-store-current-directory store)
   (with-store-state (:read-only store)
     (with-store-guard ()
@@ -597,10 +666,10 @@ pathname until a non-existant directory name has been found."
                    (update-store-random-state store)
                    (dolist (subsystem (store-subsystems store))
                      (when *store-debug*
-                       (format *trace-output* "Snapshotting subsystem ~A of ~A~%" subsystem store))
+                       (report-progress "Snapshotting subsystem ~A of ~A~%" subsystem store))
                      (snapshot-subsystem store subsystem)
                      (when *store-debug*
-                       (format *trace-output* "Successfully snapshotted ~A of ~A~%" subsystem store)))
+                       (report-progress "Successfully snapshotted ~A of ~A~%" subsystem store)))
                    (setf (store-transaction-run-time store) 0)
                    (setf error nil))
               (when error
@@ -611,7 +680,7 @@ pathname until a non-existant directory name has been found."
 
 (defun truncate-log (pathname position)
   (let ((backup (make-pathname :type "backup" :defaults pathname)))
-    (format t "~&; creating log file backup: ~A~%" backup)
+    (report-progress "~&; creating log file backup: ~A~%" backup)
     (with-open-file (s pathname
                        :element-type '(unsigned-byte 8)
                        :direction :input)
@@ -619,7 +688,7 @@ pathname until a non-existant directory name has been found."
                          :element-type '(unsigned-byte 8)
                          :direction :output)
         (copy-stream s r))))
-  (format t "~&; truncating transaction log at position ~D.~%" position)
+  (report-progress "~&; truncating transaction log at position ~D.~%" position)
   #+cmu
   (unix:unix-truncate (ext:unix-namestring pathname) position)
   #+sbcl
@@ -649,7 +718,7 @@ pathname until a non-existant directory name has been found."
                 (return-from load-transaction-log))
                (t
                 (when *show-transactions*
-                  (format t "~&;;; ~A txn @~D: ~A~%" (transaction-timestamp txn) position txn))
+                  (report-progress "~&;;; ~A txn @~D: ~A~%" (transaction-timestamp txn) position txn))
                 (let ((*txn-log-stream* s))
                   (execute-unlogged txn))))))
       (discard ()
@@ -666,7 +735,7 @@ pathname until a non-existant directory name has been found."
 
 (defmethod restore-store ((store store) &key until)
   (ensure-store-random-state store)
-  (format *trace-output* "restoring ~A~%" store)
+  (report-progress "restoring ~A~%" store)
   (let ((*store* store))
     (setf (store-state store) :opened)
     (with-store-state (:restore)
@@ -675,24 +744,41 @@ pathname until a non-existant directory name has been found."
           (close-transaction-log-stream store)
           (let ((transaction-log (store-transaction-log-pathname store))
                 (error t))
-;;; restore the subsystems
+            ;; restore the subsystems
             (unwind-protect
                  (progn
                    ;; Subsystems may not do any persistent changes when restoring.
                    (dolist (subsystem (store-subsystems store))
-;;; check that UNTIL > snapshot date
+                     ;; check that UNTIL > snapshot date
                      (when *store-debug*
-                       (format *trace-output* "Restoring the subsystem ~A of ~A~%" subsystem store))
+                       (report-progress "Restoring the subsystem ~A of ~A~%" subsystem store))
                      (restore-subsystem store subsystem :until until))
                    (when (probe-file transaction-log)
-                     (format *trace-output* "loading transaction log ~A~%" transaction-log)
+                     (report-progress "loading transaction log ~A~%" transaction-log)
                      (setf (store-transaction-run-time store) 0)
                      (load-transaction-log transaction-log :until until))
                    (setf error nil))
               (when error
                 (dolist (subsystem (store-subsystems store))
                   (when *store-debug*
-                    (format *trace-output* "Closing the subsystem ~A of ~A~%"
-                            subsystem store))
+                    (report-progress "Closing the subsystem ~A of ~A~%"
+                                     subsystem store))
                   (close-subsystem store subsystem)
                   (setf (store-state store) :closed))))))))))
+
+#|
+(defmacro disallow-cl-function-in-transaction (function)
+  `(defun ,function (&rest args)
+     (when (in-transaction-p)
+       (error 'invalid-environment-access :function ',function))
+     (apply (find-symbol ,(symbol-name function) :common-lisp) args)))
+
+(disallow-cl-function-in-transaction get-internal-run-time)
+(disallow-cl-function-in-transaction get-internal-real-time)
+(disallow-cl-function-in-transaction sleep)
+
+(defun get-universal-time ()
+  (if (in-transaction-p)
+      (transaction-timestamp *current-transaction*)
+      (common-lisp::get-universal-time)))
+|#

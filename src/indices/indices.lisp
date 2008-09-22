@@ -88,7 +88,7 @@ the new hash-table."
 
 (defmethod index-add ((index unique-index) object)
   "Add an object using the value of the specified slot as key. When
-the hash-table entry already contains a value, an error is thrown."
+the hash-table entry already contains a value, an error is signalled."
   (unless (slot-boundp object (slot-index-slot-name index))
     (return-from index-add))
   (let* ((key (slot-value object (slot-index-slot-name index)))

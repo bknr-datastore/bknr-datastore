@@ -22,9 +22,9 @@
   (call-next-method))
 
 ;;; muesste fehler werfen weil transaction in initialize-transient-instance
-(make-object 'boeses-object)
+(make-instance 'boeses-object)
 
-(make-object 'foobar :a 2)
+(make-instance 'foobar :a 2)
 
 ;;; jetzt foobar bitte nicht mehr persistent
 (defclass foobar ()

@@ -29,6 +29,7 @@
                                             (:file "encoding" :depends-on ("package"))
                                             (:file "txn" :depends-on ("encoding" "package"))
                                             (:file "object" :depends-on ("txn" "package"))
+                                            (:file "object-tests" :depends-on ("object" "package"))
                                             (:file "json" :depends-on ("object"))
                                             (:file "blob" :depends-on ("txn" "object" "package"))))))
 

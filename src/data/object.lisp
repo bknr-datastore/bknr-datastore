@@ -1,8 +1,36 @@
 ;;; MOP based object subsystem for the BKNR datastore
 
+;; Internal slots should have a different slot descriptor class, (setf
+;; slot-value-using-class) should only be defined for
+;; application-defined slots, not internal slots (like ID, maybe
+;; others).
+
+;; get-internal-real-time, get-internal-run-time, get-universal-time
+;; need to be shadowed and disallowed.
+
 (in-package :bknr.datastore)
 
-(cl-interpol:enable-interpol-syntax)
+(define-condition inconsistent-slot-persistence-definition (store-error)
+  ((class :initarg :class)
+   (slot-name :initarg :slot-name))
+  (:report (lambda (e stream)
+             (with-slots (slot-name class) e
+               (format stream "Slot ~A in class ~A declared as both transient and persistent"
+                       slot-name class)))))
+
+(define-condition object-subsystem-not-found-in-store (store-error)
+  ((store :initarg :store))
+  (:report (lambda (e stream)
+             (with-slots (store) e
+               (format stream "Could not find a store-object-subsystem in the current store ~A" store)))))
+
+(define-condition persistent-slot-modified-outside-of-transaction (store-error)
+  ((slot-name :initarg :slot-name)
+   (object :initarg :object))
+  (:report (lambda (e stream)
+             (with-slots (slot-name object) e
+               (format stream "Attempt to modify persistent slot ~A of ~A outside of a transaction"
+                       slot-name object)))))
 
 (defclass store-object-subsystem ()
   ((next-object-id :initform 0
@@ -10,27 +38,16 @@
                    :documentation "Next object ID to assign to a new object")))
 
 (defun store-object-subsystem ()
-  (let ((subsystem (find-if (lambda (subsystem)
-                              (typep subsystem 'store-object-subsystem))
+  (let ((subsystem (find-if (alexandria:rcurry #'typep 'store-object-subsystem)
                             (store-subsystems *store*))))
     (unless subsystem
-      (error "Could not find a store-object-subsystem in the current store ~a." *store*))
+      (error 'object-subsystem-not-found-in-store :store *store*))
     subsystem))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (finalize-inheritance
    (defclass persistent-class (indexed-class)
-     ((transient-slot-initargs :initform nil
-                               :accessor persistent-class-transient-slot-initargs)))))
-
-(defmethod determine-transient-slot-initargs ((class persistent-class))
-  (with-slots (transient-slot-initargs) class
-    (setf transient-slot-initargs nil)
-    (dolist (slot (class-slots class))
-      (when (and (typep slot 'persistent-effective-slot-definition)
-                 (persistent-effective-slot-definition-transient slot)
-                 (slot-definition-initargs slot))
-        (pushnew (car (slot-definition-initargs slot)) transient-slot-initargs)))))
+     ())))
 
 (defmethod validate-superclass ((sub persistent-class) (super indexed-class))
   t)
@@ -41,101 +58,114 @@
   (let ((instance-count (length (class-instances class))))
     (when (plusp instance-count)
       (unless *suppress-schema-warnings*
-        (format *trace-output* "~&; updating ~A instances of ~A for class changes~%"
-                instance-count class))
+        (report-progress "~&; updating ~A instances of ~A for class changes~%"
+                         instance-count class))
       (mapc #'reinitialize-instance (class-instances class)))))
 
-(defmethod instance :after ((class persistent-class) &rest args)
-  (declare (ignore args))
-  (determine-transient-slot-initargs class))
-
-(defmethod reinitialize-instance :after ((class persistent-class) &rest args)
-  (declare (ignore args))
-  (determine-transient-slot-initargs class)
+(defmethod reinitialize-instance :after ((class persistent-class) &key)
   (when (and (boundp '*store*) *store*)
     (update-instances-for-changed-class (class-name class))
     (unless *suppress-schema-warnings*
-      (format *trace-output* "~&; class ~A has been changed. To ensure correct schema ~
+      (report-progress "~&; class ~A has been changed. To ensure correct schema ~
                               evolution, please snapshot your datastore.~%"
-              (class-name class)))))
+                       (class-name class)))))
 
 (defclass persistent-direct-slot-definition (index-direct-slot-definition)
-  ((transient :initarg :transient :initform nil)
-   (relaxed-object-reference :initarg :relaxed-object-reference :initform nil)))
+  ((relaxed-object-reference :initarg :relaxed-object-reference
+                             :initform nil)
+   (transient :initarg :transient
+              :initform nil)))
 
 (defclass persistent-effective-slot-definition (index-effective-slot-definition)
-  ((transient :initarg :transient
-              :initform nil
-              :reader persistent-effective-slot-definition-transient)
-   (relaxed-object-reference :initarg :relaxed-object-reference
-                             :initform nil)))
+  ((relaxed-object-reference :initarg :relaxed-object-reference
+                             :initform nil)
+   (transient :initarg :transient
+              :initform nil)))
 
-(defmethod persistent-slot-p ((slot standard-effective-slot-definition))
-  nil)
 
-(defmethod persistent-slot-p ((slot persistent-effective-slot-definition))
-  (not (slot-value slot 'transient)))
+(defgeneric transient-slot-p (slotd)
+  (:method ((slotd t))
+    t)
+  (:method ((slotd persistent-direct-slot-definition))
+    (slot-value slotd 'transient))
+  (:method ((slotd persistent-effective-slot-definition))
+    (slot-value slotd 'transient)))
 
-(defmethod relaxed-object-reference-slot-p ((slot standard-effective-slot-definition))
-  nil)
+(defgeneric relaxed-object-reference-slot-p (slotd)
+  (:method ((slotd t))
+    nil)
+  (:method ((slotd persistent-effective-slot-definition))
+    (slot-value slotd 'relaxed-object-reference))
+  (:documentation "Return whether the given slot definition specifies
+that the slot is relaxed.  If a relaxed slot holds a pointer to
+another persistent object and the pointed-to object is deleted, slot
+reads will return nil."))
 
-(defmethod relaxed-object-reference-slot-p ((slot persistent-effective-slot-definition))
-  "Slot is a relaxed object reference slot.  If the slot holds a
-pointer to another persistent object and the referenced object is
-deleted, slot reads will return nil."
-  (slot-value slot 'relaxed-object-reference))
+(defmethod (setf slot-value-using-class) :before ((newval t)
+                                                  (class persistent-class)
+                                                  object
+                                                  (slotd persistent-effective-slot-definition))
+  (unless (transient-slot-p slotd)
+    (let ((slot-name (slot-definition-name slotd)))
+      (unless (or (in-transaction-p)
+                  (member slot-name '(last-change id)))
+        (error 'persistent-slot-modified-outside-of-transaction :slot-name slot-name :object object))
+      (when (and (not (eq :restore (store-state *store*)))
+                 (not (member slot-name '(last-change id))))
+        (setf (slot-value object 'last-change) (current-transaction-timestamp))))))
 
-(defmethod (setf slot-value-using-class) :before (newval (class persistent-class) object slotd)
-  (let ((slot-name (slot-definition-name slotd)))
-    (when (and (persistent-slot-p slotd)
-               (not (in-transaction-p)))
-      (error "Attempt to set persistent slot ~A of ~A outside of a transaction"
-             slot-name object))
-    (when (and (persistent-slot-p slotd)
-               (not (eq :restore (store-state *store*)))
-               (not (eq 'last-change slot-name)))
-      (setf (slot-value object 'last-change) (current-transaction-timestamp)))))
+(defmethod (setf slot-value-using-class) :after (newval
+                                                 (class persistent-class)
+                                                 object
+                                                 (slotd persistent-effective-slot-definition))
+  (when (and (not (transient-slot-p slotd))
+             (in-anonymous-transaction-p)
+             (not (member (slot-definition-name slotd) '(last-change id))))
+    (encode (make-instance 'transaction
+                           :timestamp (transaction-timestamp *current-transaction*)
+                           :function-symbol 'tx-change-slot-values
+                           :args (list object (slot-definition-name slotd) newval))
+            (anonymous-transaction-log-buffer *current-transaction*))))
 
-(defmethod (setf slot-value-using-class) :after (newval (class persistent-class) object slotd)
-  (when (in-anonymous-transaction-p)
-    (push (make-instance 'transaction
-                         :timestamp (get-universal-time)
-                         :function-symbol 'tx-change-slot-values
-                         :args (list object (slot-definition-name slotd) newval))
-          (anonymous-transaction-transactions *current-transaction*))))
+(define-condition transient-slot-cannot-have-initarg (store-error)
+  ((class :initarg :class)
+   (slot-name :initarg :slot-name))
+  (:documentation "A transient slot may not have an :initarg
+  specified, as initialize-instance is only used for persistent
+  initialization.")
+  (:report (lambda (e stream)
+             (with-slots (class slot-name) e
+               (format stream "The transient slot ~A in class ~A was defined as having an initarg, which is not supported"
+                       slot-name (class-name class))))))
 
-(defmethod direct-slot-definition-class ((class persistent-class) &key &allow-other-keys)
+(defmethod direct-slot-definition-class ((class persistent-class) &key initargs transient name)
+  ;; It might be better to do the error checking in an
+  ;; initialize-instance method of persistent-direct-slot-definition
+  (when (and initargs transient)
+    (error 'transient-slot-cannot-have-initarg :class class :slot-name name))
   'persistent-direct-slot-definition)
 
-(defmethod effective-slot-definition-class ((class persistent-class) &rest initargs)
-  (declare (ignore initargs))
+(defmethod effective-slot-definition-class ((class persistent-class) &key)
   'persistent-effective-slot-definition)
 
-(defmethod compute-effective-slot-definition :around
-    ((class persistent-class) name direct-slots)
-  (let* ((persistent-directs (remove-if-not #'(lambda (class)
-                                                (typep class 'persistent-direct-slot-definition))
-                                            direct-slots))
-         (transient (remove-duplicates (mapcar #'(lambda (slot)
-                                                   (slot-value slot 'transient))
-                                               persistent-directs)))
-         (relaxed (reduce #'(lambda (&optional x y) (or x y))
-                          (mapcar #'(lambda (slot)
-                                      (slot-value slot 'relaxed-object-reference))
-                                  persistent-directs))))
-    (when (> (length transient) 1)
-      (error "Can not create a slot that is both persistent and transient: ~a." name))
-    (let ((normal-slot (call-next-method)))
-      (when (typep normal-slot 'persistent-effective-slot-definition)
-        (setf (slot-value normal-slot 'transient) (first transient)
-              (slot-value normal-slot 'relaxed-object-reference) relaxed))
-      normal-slot)))
+(defmethod compute-effective-slot-definition :around ((class persistent-class) name direct-slots)
+  (unless (or (every #'transient-slot-p direct-slots)
+              (notany #'transient-slot-p direct-slots))
+    (error 'inconsistent-slot-persistence-definition :class class :slot-name name))
+  (let ((effective-slot-definition (call-next-method)))
+    (when (typep effective-slot-definition 'persistent-effective-slot-definition)
+      (with-slots (relaxed-object-reference transient) effective-slot-definition
+        (setf relaxed-object-reference (some #'relaxed-object-reference-slot-p direct-slots)
+              transient (slot-value (first direct-slots) 'transient))))
+    effective-slot-definition))
 
 (defmethod class-persistent-slots ((class standard-class))
-  (remove-if-not #'persistent-slot-p (class-slots class)))
+  (remove-if #'transient-slot-p (class-slots class)))
 
 (defclass store-object ()
-  ((id :initarg :id :reader store-object-id
+  ((id :initarg :id
+       :reader store-object-id
+       :type integer
        :index-type unique-index
        :index-initargs (:test #'eql)
        :index-reader store-object-with-id :index-values all-store-objects
@@ -151,8 +181,7 @@ deleted, slot reads will return nil."
                              :slots (id))))
 
 (defun class-instances (class)
-  (unless (find-class class)
-    (error "class-instances called for nonexistent class ~A" class))
+  (find-class class)                 ; make sure that the class exists
   (store-objects-with-class class))
 
 (deftransaction store-object-touch (object)
@@ -163,7 +192,7 @@ deleted, slot reads will return nil."
   (:documentation "Return the last change time of the OBJECT.  DEPTH
   determines how deep the object graph will be traversed.")
 
-  (:method (object depth)
+  (:method ((object t) (depth integer))
     0)
 
   (:method ((object store-object) (depth (eql 0)))
@@ -192,35 +221,53 @@ deleted, slot reads will return nil."
 #+allegro
 (aclmop::finalize-inheritance (find-class 'store-object))
 
-(defmethod initialize-instance :around
-    ((object store-object) &key &allow-other-keys)
-  (if (in-anonymous-transaction-p)
-      (prog1
-          (call-next-method)
-        (push (make-instance 'transaction
-                             :function-symbol 'make-instance
-                             :timestamp (get-universal-time)
-                             :args (cons (class-name (class-of object))
-                                         (loop for slotd in (class-slots (class-of object))
-                                            for slot-name = (slot-definition-name slotd)
-                                            for slot-initarg = (first (slot-definition-initargs slotd))
-                                            when (and slot-initarg
-                                                      (slot-boundp object slot-name))
-                                            appending (list slot-initarg (slot-value object slot-name)))))
-              (anonymous-transaction-transactions *current-transaction*)))
-      (call-next-method)))
+(defmethod initialize-instance :around ((object store-object) &rest initargs &key)
+  (setf (slot-value object 'id) (allocate-next-object-id))
+  (cond
+    ((not (in-transaction-p))
+     (with-store-guard ()
+       (let ((transaction (make-instance 'transaction
+                                         :function-symbol 'make-instance
+                                         :timestamp (get-universal-time)
+                                         :args (cons (class-name (class-of object))
+                                                     (append (list :id (slot-value object 'id))
+                                                             initargs)))))
+         (with-statistics-log (*transaction-statistics* (transaction-function-symbol transaction))
+           (with-transaction-log (transaction)
+             (call-next-method))))))
+    ((in-anonymous-transaction-p)
+     (encode (make-instance 'transaction
+                            :function-symbol 'make-instance
+                            :timestamp (transaction-timestamp *current-transaction*)
+                            :args (cons (class-name (class-of object)) initargs))
+             (anonymous-transaction-log-buffer *current-transaction*))
+     (call-next-method))
+    (t
+     (call-next-method))))
 
-(defmethod initialize-instance :after ((object store-object) &key id &allow-other-keys)
-  (let ((subsystem (store-object-subsystem)))
-    (cond (id
-           ;; during restore, use the given ID
-           (when (>= id (next-object-id subsystem))
-             (setf (next-object-id subsystem) (1+ id))))
-          (t
-           ;; normal transaction: assign a new ID
-           (setf id (next-object-id subsystem))
-           (incf (next-object-id subsystem))
-           (setf (slot-value object 'id) id)))))
+(defvar *allocate-object-id-lock* (bt:make-lock "Persistent Object ID Creation"))
+
+(defun allocate-next-object-id ()
+  (mp-with-lock-held (*allocate-object-id-lock*)
+    (let ((id (next-object-id (store-object-subsystem))))
+      (incf (next-object-id (store-object-subsystem)))
+      id)))
+    
+(defun initialize-transient-slots (object)
+  (dolist (slotd (class-slots (class-of object)))
+    (when (and (typep slotd 'persistent-effective-slot-definition)
+               (transient-slot-p slotd)
+               (slot-definition-initfunction slotd))
+      (setf (slot-value object (slot-definition-name slotd))
+            (funcall (slot-definition-initfunction slotd))))))
+ 
+(defmethod initialize-instance :after ((object store-object) &key)
+  ;; This is called only when initially creating the (persistent)
+  ;; instance, not during restore.  During restore, the
+  ;; INITIALIZE-TRANSIENT-INSTANCE function is called for all
+  ;; persistent objects after the snapshot has been read, but before
+  ;; running the transaction log.
+  (initialize-transient-instance object))
 
 (defmethod print-object ((object store-object) stream)
   (print-unreadable-object (object stream :type t)
@@ -233,7 +280,7 @@ deleted, slot reads will return nil."
       (call-next-method)))
 
 (defmethod change-class :before ((object store-object) class &rest args)
-  (declare (ignore args))
+  (declare (ignore class args))
   (when (not (in-transaction-p))
     (error "Can't change class of persistent object ~A using change-class ~
             outside of transaction, please use PERSISTENT-CHANGE-CLASS instead" object)))
@@ -248,19 +295,13 @@ deleted, slot reads will return nil."
                           :timestamp (get-universal-time)
                           :args (append (list object (if (symbolp class) class (class-name class))) args))))
 
-(defgeneric initialize-persistent-instance (store-object &key &allow-other-keys)
-  (:documentation
-   "Initializes the persistent aspects of a persistent object. This
-method is called at the creation of a persistent object, but not when
-the object is loaded from a snapshot."))
-
 (defgeneric initialize-transient-instance (store-object)
   (:documentation
    "Initializes the transient aspects of a persistent object. This
-method is called whenever a persistent object is initialized, also
-when the object is loaded from a snapshot."))
+method is called after a persistent object has been initialized, also
+when the object is loaded from a snapshot, but before reading the
+transaction log."))
 
-(defmethod initialize-persistent-instance ((object store-object) &key))
 (defmethod initialize-transient-instance ((object store-object)))
 
 (defmethod store-object-persistent-slots ((object store-object))
@@ -293,22 +334,6 @@ when the object is loaded from a snapshot."))
        (defclass ,class ,superclasses ,slots
          ,@(unless metaclass '((:metaclass persistent-class)))
          ,@class-options))))
-
-#+nil
-(define-persistent-class foo ()
-  ((a :read)))
-#+nil
-(let ((foo (make-object 'foo :a 2)))
-  (foo-a foo))
-
-;;; test fuer multiple inheritance
-#+nil
-(progn
-  (define-persistent-class bar ()
-    ((b :read)))
-  (define-persistent-class blorg (foo bar)
-    ((c :read)))
-  (make-object 'blorg :a 2 :b 3 :c 4))
 
 ;;; binary snapshot
 
@@ -471,7 +496,12 @@ the slots are read from the snapshot and ignored."
       ;; If the class is NIL, it was not found in the currently
       ;; running Lisp image and objects of this class will be ignored.
       (when class
-        (make-instance class :id object-id)))))
+        (let ((object (allocate-instance class)))
+          (setf (slot-value object 'id) object-id
+                (next-object-id (store-object-subsystem)) (max (1+ object-id)
+                                                               (next-object-id (store-object-subsystem))))
+          (dolist (index (class-slot-indices class 'id))
+            (index-add index object)))))))
 
 (defun snapshot-read-slots (stream layouts)
   (let* ((layout-id (%decode-integer stream))
@@ -519,6 +549,12 @@ the slots are read from the snapshot and ignored."
   (let ((*current-object-slot* nil))
     (%decode-store-object stream)))
 
+(define-condition invalid-reference (warning)
+  ((id :initarg :id))
+  (:report (lambda (e stream)
+             (format stream "internal inconsistency during restore - store object with ID ~A could not be found"
+                     (slot-value e 'id)))))
+
 (defun %decode-store-object (stream)
   ;; This is actually called in two contexts, when a slot-value is to
   ;; be filled with a reference to a store object and when a list of
@@ -534,8 +570,7 @@ the slots are read from the snapshot and ignored."
   ;; lists in slots).
   (let* ((id (%decode-integer stream))
          (object (or (store-object-with-id id)
-                     (warn "internal inconsistency during restore: can't find store object ~A in loaded store"
-                           id)))
+                     (warn 'invalid-reference :id id)))
          (container (first *current-object-slot*))
          (slot-name (second *current-object-slot*)))
     (cond (object object)
@@ -556,6 +591,10 @@ the slots are read from the snapshot and ignored."
                     id slot-name (type-of container)
                     (if container (store-object-id container) "unknown object"))))))
 
+(defun encode-current-object-id (stream)
+  (%write-tag #\I stream)
+  (%encode-integer (next-object-id (store-object-subsystem)) stream))
+
 (defmethod snapshot-subsystem ((store store) (subsystem store-object-subsystem))
   (let ((snapshot (store-subsystem-snapshot-pathname store subsystem)))
     (with-open-file (s snapshot
@@ -566,6 +605,7 @@ the slots are read from the snapshot and ignored."
       (let ((class-layouts (make-hash-table)))
         (with-transaction (:prepare-for-snapshot)
           (map-store-objects #'prepare-for-snapshot))
+        (encode-current-object-id s)
         (map-store-objects (lambda (object) (when (subtypep (type-of object) 'store-object)
                                               (encode-create-object class-layouts object s))))
         (map-store-objects (lambda (object) (when (subtypep (type-of object) 'store-object)
@@ -577,16 +617,16 @@ the slots are read from the snapshot and ignored."
     (clear-class-indices (find-class class-name))))
 
 (defmethod restore-subsystem ((store store) (subsystem store-object-subsystem) &key until)
-                                        ; XXX check that until > snapshot time
+  ;; XXX check that until > snapshot time
   (declare (ignore until))
   (let ((snapshot (store-subsystem-snapshot-pathname store subsystem)))
-;;; not all indices that should be cleared are cleared. maybe
-;;; check on first instatiation of a class?
+    ;; not all indices that should be cleared are cleared. maybe
+    ;; check on first instatiation of a class?
     (dolist (class-name (cons 'store-object (all-store-classes)))
       (clear-class-indices (find-class class-name)))
     (setf (next-object-id subsystem) 0)
     (when (probe-file snapshot)
-      (format *trace-output* "~&; loading snapshot file ~A~%" snapshot)
+      (report-progress "~&; loading snapshot file ~A~%" snapshot)
       (with-open-file (s snapshot
                          :element-type '(unsigned-byte 8)
                          :direction :input)
@@ -603,72 +643,38 @@ the slots are read from the snapshot and ignored."
                       (when (and (plusp created-objects)
                                  (zerop (mod created-objects 10000)))
                         #+nil (format t "Snapshot position ~A~%" (file-position s))
-                        (format t "~A objects created.~%" created-objects)
+                        (report-progress "~A objects created.~%" created-objects)
                         (force-output))
                       (when (and (plusp read-slots)
                                  (zerop (mod read-slots 10000)))
-                        (format t "~A of ~A objects initialized.~%" read-slots created-objects)
+                        (report-progress "~A of ~A objects initialized.~%" read-slots created-objects)
                         (force-output))
                       (let ((char (%read-tag s nil nil)))
-                        (unless (member char '(#\O #\L #\S nil))
-                          (format t "unknown char ~A at offset ~A~%" char (file-position s)))
+                        (unless (member char '(#\I #\L #\O #\S nil))
+                          (error "unknown char ~A at offset ~A~%" char (file-position s)))
                         (ecase char
                           ((nil) (return))
+                          (#\I (setf (next-object-id (store-object-subsystem)) (%decode-integer s)))
                           (#\L (snapshot-read-layout s class-layouts))
                           (#\O (snapshot-read-object s class-layouts) (incf created-objects))
                           (#\S (snapshot-read-slots s class-layouts) (incf read-slots))))))
+                 (map-store-objects #'initialize-transient-slots)
                  (map-store-objects #'initialize-transient-instance)
                  (setf error nil))
             (when error
               (maphash #'(lambda (key val)
                            (declare (ignore key))
                            (let ((class-name (car val)))
-                             (format t "clearing indices for class ~A~%" (class-name class-name))
+                             (report-progress "clearing indices for class ~A~%" (class-name class-name))
                              (clear-class-indices class-name)))
                        class-layouts))))))))
-
-(defun remove-transient-slot-initargs (class initializers)
-  "Remove all initializers for transient slots"
-  (loop for (keyword value) on initializers by #'cddr
-     unless (find keyword (persistent-class-transient-slot-initargs class))
-     collect keyword
-     and
-     collect value))
-
-;;; create object transaction, should not be called from user code, as
-;;; we have to give it a unique id in the initargs. After the object
-;;; is created, the persistent and the transient instances are
-;;; initialized
-(defun tx-make-object (class-name &rest initargs)
-  (let (obj
-        (error t))
-    (unwind-protect
-         (let ((restoring (eq (store-state *store*) :restore)))
-           (setf obj (apply #'make-instance class-name
-                            (if restoring
-                                (remove-transient-slot-initargs (find-class class-name) initargs)
-                                initargs)))
-           (apply #'initialize-persistent-instance obj initargs)
-           (initialize-transient-instance obj)
-           (setf error nil)
-           obj)
-      (when (and error obj)
-        (destroy-object obj)))))
-
-(defun make-object (class-name &rest initargs)
-  "Make a persistent object of class named CLASS-NAME. Calls MAKE-INSTANCE with INITARGS."
-  (with-store-guard ()
-    (execute (make-instance 'transaction
-                            :function-symbol 'tx-make-object
-                            :args (append (list class-name
-                                                :id (next-object-id (store-object-subsystem)))
-                                          initargs)))))
 
 (defun tx-delete-object (id)
   (destroy-object (store-object-with-id id)))
 
 (defun delete-object (object)
-  (if (in-transaction-p)
+  (if (and (in-transaction-p)
+           (not (in-anonymous-transaction-p)))
       (destroy-object object)
       (execute (make-instance 'transaction :function-symbol 'tx-delete-object
                               :timestamp (get-universal-time)
@@ -685,10 +691,10 @@ the slots are read from the snapshot and ignored."
                               :args (mapcar #'store-object-id objects)))))
 
 (defgeneric cascade-delete-p (object referencing-object)
+  (:method (object referencing-object)
+    (declare (ignore object referencing-object))
+    nil)
   (:documentation "return non-nil if the REFERENCING-OBJECT should be deleted when the OBJECT is deleted"))
-
-(defmethod cascade-delete-p (object referencing-object)
-  nil)
 
 (defun partition-list (list predicate)
   "Return two list values, the first containing all elements from LIST
@@ -730,8 +736,11 @@ to cascading deletes."
                           :timestamp (get-universal-time)
                           :args (list* object slots-and-values))))
 
-(defmethod prepare-for-snapshot (object)
-  nil)
+(defgeneric prepare-for-snapshot (object)
+  (:method ((object store-object))
+    nil)
+  (:documentation "Called for every store object before a snapshot is
+  written."))
 
 (defun find-store-object (id-or-name &key (class 'store-object) query-function key-slot-name)
   "Mock up implementation of find-store-object API as in the old datastore.

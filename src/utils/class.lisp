@@ -7,8 +7,9 @@
     (let* ((initarg (make-keyword-from-string (symbol-name name)))
 	   (accessor (intern (concatenate 'string (symbol-name class) "-"
 					  (symbol-name name)) *package*)))
-      (push initarg rest)
-      (push :initarg rest)
+      (unless (getf rest :transient)
+        (push initarg rest)
+        (push :initarg rest))
       (case access
 	(:read
 	 (push accessor rest)
@@ -22,8 +23,7 @@
       (cons name rest))))
 
 (defmacro define-bknr-class (class (&rest superclasses) slots &rest class-options)
-  (let ((slots (mapcar #'(lambda (slot) (compute-bknr-slot class slot))
-		       slots)))
+  (let ((slots (mapcar (lambda (slot) (compute-bknr-slot class slot)) slots)))
     ;; the eval-when is there to create the index access functions at compile time
     `(eval-when (:compile-toplevel :load-toplevel :execute)
       (defclass ,class ,superclasses

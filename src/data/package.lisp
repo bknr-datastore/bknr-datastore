@@ -7,9 +7,19 @@
   #+cmu
   (:shadowing-import-from :common-lisp #:subtypep #:typep)
   (:shadowing-import-from :cl-interpol quote-meta-chars)
+  #|  (:shadow :cl #:get-internal-run-time #:get-internal-real-time #:get-universal-time #:sleep) |#
   (:export #:*store-debug*
            #:*store*
            #+(or) #:with-store ; currently not exported, does not work with indices
+
+           #|
+           ;; COMMON-LISP overloads to make sure that transaction
+           ;; don't access time information
+           #:get-internal-run-time
+           #:get-internal-real-time
+           #:get-universal-time
+           #:sleep
+           |#
 
            ;; session
            #:session
@@ -51,7 +61,6 @@
            #:cascade-delete-p
            #:cascading-delete-object
 
-           #:initialize-persistent-instance
            #:initialize-transient-instance
 
            #:store-object-with-id
@@ -63,8 +72,6 @@
            #:prepare-for-snapshot
            #:find-store-object
            #:create-object-transaction
-           #:tx-make-object
-           #:make-object
            #:tx-change-slot-values
            #:change-slot-values
            #:store-object-add-keywords
@@ -120,3 +127,6 @@
 
            ;; JSON serialization
            #:with-json-ignore-slots))
+
+(defpackage :bknr.datastore.tests
+  (:use :cl :bknr.datastore :bknr.indices :unit-test))

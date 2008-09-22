@@ -130,7 +130,7 @@
 
 (close-store)
 (make-instance 'tutorial-store :directory "/tmp/tutorial-store/"
-	       :subsystems nil)
+                               :subsystems nil)
 ; Warning:  restoring #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
 ; => #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
 
@@ -147,14 +147,14 @@
 ;;; "/tmp/tutorial-store/", as we can see:
 
 (with-open-file (s "/tmp/tutorial-store/current/transaction-log"
-			    :direction :input)
-	     (file-length s))
+                   :direction :input)
+  (file-length s))
 ; => 126
 (incf-counter)
 ; => 2
 (with-open-file (s "/tmp/tutorial-store/current/transaction-log"
-			    :direction :input)
-	     (file-length s))
+                   :direction :input)
+  (file-length s))
 ; => 168
 
 ;;; The transaction log is kept in a directory called "current", which
@@ -181,7 +181,7 @@
 ;;; The store can then be recreated, and the transaction log will be
 ;;; read and executed upon restore.
 (make-instance 'tutorial-store :directory "/tmp/tutorial-store/"
-	       :subsystems nil)
+                               :subsystems nil)
 
 ; Warning:  restoring #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
 ; Warning:  loading transaction log
@@ -289,7 +289,7 @@
 (close-store)
 ; => NIL
 (make-instance 'tutorial-store :directory "/tmp/tutorial-store/"
-	       :subsystems (list (make-instance 'counter-subsystem)))
+                               :subsystems (list (make-instance 'counter-subsystem)))
 ; Warning:  restoring #<TUTORIAL-STORE DIR: "/tmp/tutorial-store/">
 ; Warning:  Could not find store counter value, setting to 0.
 ; Warning:  loading transaction log
@@ -337,8 +337,8 @@
 
 (close-store)
 (make-instance 'mp-store :directory "/tmp/object-store/"
-	       :subsystems (list
-			    (make-instance 'store-object-subsystem)))
+                         :subsystems (list
+                                      (make-instance 'store-object-subsystem)))
 
 ; Warning:  restoring #<MP-STORE DIR: "/tmp/object-store/">
 ; restoring #<MP-STORE DIR: "/tmp/object-store/">
@@ -349,13 +349,13 @@
 ;;; We can now create a few store objects (which is not very
 ;;; interesting in itself). Store objects have to be created inside a
 ;;; transaction so that the object creation is logged into the
-;;; transaction log. This is done by using the transaction
-;;; `MAKE-OBJECT'. The transaction also automatically gets a unique ID
-;;; from the store object subsystem.
+;;; transaction log.  If `MAKE-INSTANCE' is used outside of a
+;;; transaction, the datastore will create the object in a new,
+;;; separate transaction.
 
-(make-object 'store-object)
+(make-instance 'store-object)
 ; => #<STORE-OBJECT ID: 0>
-(make-object 'store-object)
+(make-instance 'store-object)
 ; => #<STORE-OBJECT ID: 1>
 (all-store-objects)
 ; => (#<STORE-OBJECT ID: 0> #<STORE-OBJECT ID: 1>)
@@ -366,8 +366,8 @@
 ;;; `DELETE-OBJECT', which will log the deletion of the object in the
 ;;; transaction log, and remove the object from all its indices.
 
-(make-object 'store-object)
-; executing transaction #<TRANSACTION 21.04.2008 08:02:10 TX-MAKE-OBJECT STORE-OBJECT ID 2> at timestamp 3417746530
+(make-instance 'store-object)
+; executing transaction #<TRANSACTION 21.04.2008 08:02:10 MAKE-INSTANCE STORE-OBJECT ID 2> at timestamp 3417746530
 ; => #<STORE-OBJECT ID: 12>
 (store-object-with-id 2)
 ; => #<STORE-OBJECT ID: 2>
@@ -395,9 +395,9 @@
 ;;; This gets macroexpanded to the following form.
 
 (DEFINE-BKNR-CLASS TUTORIAL-OBJECT
-                   (STORE-OBJECT)
-                   ((A :READ))
-                   (:METACLASS PERSISTENT-CLASS))
+    (STORE-OBJECT)
+  ((A :READ))
+  (:METACLASS PERSISTENT-CLASS))
 
 ;;; The macro DEFINE-BKNR-CLASS is a short form of the macro DEFCLASS,
 ;;; it expands to the following code. The `EVAL-WHEN' is
@@ -405,17 +405,17 @@
 
 (EVAL-WHEN (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL :EXECUTE)
   (DEFCLASS TUTORIAL-OBJECT
-            (STORE-OBJECT)
-            ((A :READER TUTORIAL-OBJECT-A :INITARG :A))
-            (:METACLASS PERSISTENT-CLASS)))
+      (STORE-OBJECT)
+    ((A :READER TUTORIAL-OBJECT-A :INITARG :A))
+    (:METACLASS PERSISTENT-CLASS)))
 
 ;;; We can now create a few instance of `TUTORIAL-OBJECT':
 
-(make-object 'tutorial-object :a 2)
+(make-instance 'tutorial-object :a 2)
 ; => #<TUTORIAL-OBJECT ID: 3>
-(make-object 'tutorial-object :a 2)
+(make-instance 'tutorial-object :a 2)
 ; => #<TUTORIAL-OBJECT ID: 4>
-(make-object 'tutorial-object :a 2)
+(make-instance 'tutorial-object :a 2)
 ; => #<TUTORIAL-OBJECT ID: 5>
 
 (store-object-with-id 5)
@@ -441,8 +441,8 @@
 (define-persistent-class tutorial-object2 ()
   ((b :update)))
 
-(make-object 'tutorial-object2 :b 3)
-; executing transaction #<TRANSACTION 21.04.2008 08:03:27 TX-MAKE-OBJECT TUTORIAL-OBJECT2 ID 6 B 3> at timestamp 3417746607
+(make-instance 'tutorial-object2 :b 3)
+; executing transaction #<TRANSACTION 21.04.2008 08:03:27 MAKE-INSTANCE TUTORIAL-OBJECT2 ID 6 B 3> at timestamp 3417746607
 ; => #<TUTORIAL-OBJECT2 ID: 6>
 (setf (slot-value (store-object-with-id 6) 'b) 4)
 ; => Error
@@ -455,18 +455,20 @@
 
 ;;;## Object creation and deletion protocol
 
-;;; Persistent objects have the metaclass `PERSISTENT-CLASS', and have
-;;; to be created using the function `MAKE-OBJECT'. This creates an
-;;; instance of the object inside a transaction, sets its ID slot
-;;; appropriately, and then calls `INITIALIZE-PERSISTENT-INSTANCE' and
-;;; `INITIALIZE-TRANSIENT-INSTANCE'. The first method is called when
-;;; the object is created inside a transaction, but not if the object
-;;; is being restored from the snapshot file. This method has to be
-;;; overridden in order to initialize persistent
-;;; slots. `INITIALIZE-TRANSIENT-INSTANCE' is called at object
-;;; creation inside a transaction and at object creation during
-;;; restore. It is used to initialize the transient slots (not logged
-;;; to the snapshot file) of a persistent object.
+;;; Persistent objects have the metaclass `PERSISTENT-CLASS'.  They
+;;; are created using `MAKE-INSTANCE' just like any other CLOS object.
+;;; The datastore allocates a unique ID for the object and initializes
+;;; it using the usual CLOS protocol.  In order to perform any
+;;; additional actions during initialization of the persistent
+;;; instance, the `INITIALIZE-INSTANCE' function must be specialized
+;;; for the persistent class.  In addition, the datastore calls the
+;;; `INITIALIZE-TRANSIENT-INSTANCE' for the new object when it is
+;;; initially created as well as when it is restored from the
+;;; transaction log or snapshot file.  It may be used to initialize
+;;; transient aspects of the objects, but it must not alter the
+;;; persistent state of the object.  `INITIALIZE-TRANSIENT-INSTANCE'
+;;; does not have access to the initargs used to initially create the
+;;; persistent instance.
 ;;;
 ;;; We can define the following class with a transient and a
 ;;; persistent slot.
@@ -476,8 +478,8 @@
    (b :update)))
 
 ;;; We can modify the slot `A' outside a transaction:
-(make-object 'protocol-object :a 1 :b 2)
-; executing transaction #<TRANSACTION 21.04.2008 08:10:49 TX-MAKE-OBJECT PROTOCOL-OBJECT ID 7 A 1 B 2> at timestamp 3417747049
+(make-instance 'protocol-object :a 1 :b 2)
+; executing transaction #<TRANSACTION 21.04.2008 08:10:49 MAKE-INSTANCE PROTOCOL-OBJECT ID 7 A 1 B 2> at timestamp 3417747049
 ; => #<PROTOCOL-OBJECT ID: 7>
 (setf (protocol-object-a (store-object-with-id 7)) 2)
 ; => 2
@@ -529,17 +531,17 @@
 
 (define-persistent-class gorilla ()
   ((name :read :index-type string-unique-index
-	 :index-reader gorilla-with-name
-	 :index-values all-gorillas)
+               :index-reader gorilla-with-name
+               :index-values all-gorillas)
    (mood :read :index-type hash-index
-	 :index-reader gorillas-with-mood
-	 :index-keys all-gorilla-moods)))
+               :index-reader gorillas-with-mood
+               :index-keys all-gorilla-moods)))
 
-(make-object 'gorilla :name "lucy" :mood :aggressive)
+(make-instance 'gorilla :name "lucy" :mood :aggressive)
 ; => #<GORILLA ID: 8>
-(make-object 'gorilla :name "john" :mood :playful)
+(make-instance 'gorilla :name "john" :mood :playful)
 ; => #<GORILLA ID: 9>
-(make-object 'gorilla :name "peter" :mood :playful)
+(make-instance 'gorilla :name "peter" :mood :playful)
 ; => #<GORILLA ID: 10>
 (gorilla-with-name "lucy")
 ; => #<GORILLA ID: 8>
@@ -583,9 +585,9 @@
 
 (close-store)
 (make-instance 'mp-store :directory "/tmp/object-store/"
-	       :subsystems (list
-			    (make-instance 'store-object-subsystem)
-			    (make-instance 'blob-subsystem)))
+                         :subsystems (list
+                                      (make-instance 'store-object-subsystem)
+                                      (make-instance 'blob-subsystem)))
 
 ;;; The blob subsystem provides a few functions and transactions to
 ;;; work with blobs. To show how to use these functions, we will
@@ -596,14 +598,14 @@
   ((name :read)))
 
 ;;; A blob can be created using the function `MAKE-BLOB-FROM-FILE',
-;;; which is a wrapper around `TX-MAKE-OBJECT' and the function
+;;; which is a wrapper around `MAKE-INSTANCE' and the function
 ;;; `BLOB-FROM-FILE'. The method `BLOB-FROM-FILE' fills the binary
 ;;; data of a blob object by reading the content of a file. This
 ;;; binary data is then stored in a file named after the ID of the
 ;;; object in the blob root directory of the blob subsystem.
 
 (make-blob-from-file "/tmp/bla.jpg" 'photo :name "foobar"
-		     :type :jpg)
+                                           :type :jpg)
 ; => #<PHOTO ID: 11, TYPE: jpg>
 
 ;;; We can work with the photo object in the same way as when we work
@@ -639,9 +641,9 @@
 (define-persistent-class relaxed-object ()
   ((a :update :relaxed-object-reference t)))
 
-(make-object 'relaxed-object)
+(make-instance 'relaxed-object)
 ; => #<RELAXED-OBJECT ID: 12>
-(make-object 'relaxed-object)
+(make-instance 'relaxed-object)
 ; => #<RELAXED-OBJECT ID: 13>
 (with-transaction ()
   (setf (slot-value (store-object-with-id 12) 'a) (store-object-with-id 13)))
@@ -786,7 +788,7 @@ Function DECODE (STREAM) =<  OBJECT
 ;;; executing your transactions inside the form `WITHOUT-SYNC'.
 
 (without-sync ()
-   (execute-a-lot-of-transactions))
+  (execute-a-lot-of-transactions))
 
 ;;;## Snapshotting and restoring the object subsystem
 
@@ -816,9 +818,7 @@ Function DECODE (STREAM) =<  OBJECT
 ;;; resolved (check the section about relaxed references). Finally,
 ;;; after each slot value has been set, the method
 ;;; `INITIALIZE-TRANSIENT-INSTANCE' is called for each created
-;;; object. The method `INITIALIZE-PERSISTENT-INSTANCE' is not called,
-;;; as it has to be executed only once at the time the persistent
-;;; object is created.
+;;; object.
 
 ;;;## Garbage collecting blobs
 
