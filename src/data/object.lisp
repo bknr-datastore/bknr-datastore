@@ -101,6 +101,11 @@ that the slot is relaxed.  If a relaxed slot holds a pointer to
 another persistent object and the pointed-to object is deleted, slot
 reads will return nil."))
 
+(defun undo-set-slot (object slot-name value)
+  (if (eq value 'unbound)
+      (slot-makunbound object slot-name)
+      (setf (slot-value object slot-name) value)))
+
 (defmethod (setf slot-value-using-class) :before ((newval t)
                                                   (class persistent-class)
                                                   object
@@ -110,6 +115,14 @@ reads will return nil."))
       (unless (or (in-transaction-p)
                   (member slot-name '(last-change id)))
         (error 'persistent-slot-modified-outside-of-transaction :slot-name slot-name :object object))
+      (when (in-anonymous-transaction-p)
+        (push (list #'undo-set-slot
+                    object
+                    (slot-definition-name slotd)
+                    (if (slot-boundp object (slot-definition-name slotd))
+                        (slot-value object (slot-definition-name slotd))
+                        'unbound))
+              (anonymous-transaction-undo-log *current-transaction*)))
       (when (and (not (eq :restore (store-state *store*)))
                  (not (member slot-name '(last-change id))))
         (setf (slot-value object 'last-change) (current-transaction-timestamp))))))

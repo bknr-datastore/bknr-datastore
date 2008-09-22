@@ -277,5 +277,16 @@
          (o2 (make-instance 'inherit-multiple :child o1)))
     (test-equal o1 (parent-child o2))))
 
+(defdstest abort-anonymous-transaction ()
+  (let (parent)
+    (with-transaction (:initial)
+      (setf parent (make-instance 'parent :child nil)))
+    (ignore-errors
+      (with-transaction (:abort)
+        (setf (parent-child parent) (make-instance 'child))
+        (error "abort")))
+    (test-equal nil (parent-child parent))
+    (test-equal nil (class-instances 'child))))
+
 (defun run-datastore-test (name)
   (unit-test:run-test (gethash name *tests*)))

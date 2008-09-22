@@ -64,10 +64,10 @@
   (:documentation
    "Signaled when WITH-TRANSACTION forms are nested."))
 
-(define-condition anonymous-transaction-in-named-transaction (store-error)
+(define-condition anonymous-transaction-in-transaction (store-error)
   ()
   (:documentation
-   "Signaled when an anonymous transaction is started from within a named transaction."))
+   "Signaled when an anonymous transaction is started from within another transaction, transactions do not nest."))
 
 (define-condition no-subsystems (store-error)
   ()
@@ -555,7 +555,9 @@ transaction, if any."
           :initform (error "missing label in anonymous transaction definition"))
    (log-buffer :initarg :log-buffer
                :accessor anonymous-transaction-log-buffer
-               :initform (flex:make-in-memory-output-stream))))
+               :initform (flex:make-in-memory-output-stream))
+   (undo-log :initform nil
+             :accessor anonymous-transaction-undo-log)))
 
 (defmethod print-object ((transaction anonymous-transaction) stream)
   (print-unreadable-object (transaction stream :type t)
@@ -592,14 +594,38 @@ transaction, if any."
                    :label label
                    :log-buffer (flex:make-in-memory-input-stream buffer))))
 
+(define-condition rollback-failed (error)
+  ((transaction :initarg transaction)
+   (original-error :initarg :original-error))
+  (:report (lambda (e stream)
+             (with-slots (transaction original-error) e
+               (format stream "Rollback of transaction ~A failed: ~A" transaction original-error)))))
+
+(defun anonymous-transaction-undo (transaction)
+  (handler-case
+      (dolist (command (anonymous-transaction-undo-log transaction))
+        (apply (car command) (cdr command)))
+    (error (e)
+      (error 'rollback-failed
+             :transaction transaction
+             :original-error e))))
+
+(defun do-with-transaction (label thunk)
+  (when (in-transaction-p)
+    (error 'anonymous-transaction-in-transaction))
+  (let ((txn (make-instance 'anonymous-transaction :label label))
+        (next-object-id (next-object-id (store-object-subsystem))))
+    (with-transaction-log (txn)
+      (handler-case
+          (funcall thunk)
+        (error (e)
+          (setf (next-object-id (store-object-subsystem)) next-object-id)
+          (anonymous-transaction-undo txn)
+          (error e))))))
+
 (defmacro with-transaction ((&optional label) &body body)
-  (let ((txn (gensym)))
-    `(progn
-       (when (in-transaction-p)
- 	 (error 'anonymous-transaction-in-named-transaction))
-       (let ((,txn (make-instance 'anonymous-transaction :label ,(if (symbolp label) (symbol-name label) label))))
-         (with-transaction-log (,txn)
-           ,@body)))))
+  `(do-with-transaction ,(if (symbolp label) (symbol-name label) label)
+     (lambda () ,@body)))
 
 (defmethod execute-unlogged ((transaction anonymous-transaction))
   ;; EXECUTE-UNLOGGED is called for anonymous transactions only when
