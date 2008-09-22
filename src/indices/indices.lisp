@@ -27,7 +27,7 @@ SLOT-NAME is used as a key to the internal hash-table.")
   (unless (= (length slots) 1)
     (error "Exactly one slot name in :SLOTS initarg required to create a SLOT-INDEX"))
   (with-slots (hash-table slot-name) index
-    (setf hash-table (make-hash-table :test test)
+    (setf hash-table (make-hash-table :test test #+sbcl #+sbcl :synchronized t)
 	  slot-name (first slots)
 	  (slot-value index 'index-nil) index-nil)))
 
@@ -65,7 +65,7 @@ SLOT-NAME is used as a key to the internal hash-table.")
 
 (defmethod index-clear ((index slot-index))
   (with-slots (hash-table) index
-    (setf hash-table (make-hash-table :test (hash-table-test hash-table)))))
+    (setf hash-table (make-hash-table :test (hash-table-test hash-table) #+sbcl #+sbcl :synchronized t))))
 
 (defmethod index-reinitialize ((new-index slot-index)
 			       (old-index slot-index))
@@ -110,7 +110,7 @@ the hash-table entry already contains a value, an error is signalled."
 
 (defmethod initialize-instance :after ((index string-unique-index) &key (test #'equal))
   (with-slots (hash-table) index
-    (setf hash-table (make-hash-table :test test))))
+    (setf hash-table (make-hash-table :test test #+sbcl #+sbcl :synchronized t))))
 
 (defmethod index-add :around ((index string-unique-index) object)
   (unless (slot-boundp object (slot-index-slot-name index))
@@ -421,7 +421,7 @@ the new skip-list."
   (unless (<= (length slots) 1)
     (error "Can not create slot-index with more than one slot."))
   (with-slots (hash-table slot-name) index
-    (setf hash-table (make-hash-table :test test)
+    (setf hash-table (make-hash-table :test test #+sbcl #+sbcl :synchronized t)
 	  slot-name (first slots)
 	  (slot-value index 'index-superclasses) index-superclasses)))
 
@@ -490,7 +490,7 @@ the new skip-list."
 
 (defmethod index-clear ((index class-skip-index))
   (with-slots (hash-table) index
-    (setf hash-table (make-hash-table :test (hash-table-test hash-table)))))
+    (setf hash-table (make-hash-table :test (hash-table-test hash-table) #+sbcl #+sbcl :synchronized t))))
 
 (defmethod index-keys ((index class-skip-index))
   (loop for key being the hash-keys of (class-skip-index-hash-table index)
