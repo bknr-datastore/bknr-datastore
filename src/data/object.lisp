@@ -459,10 +459,12 @@ transaction log."))
 
 (defun snapshot-read-layout (stream layouts)
   (let* ((id (%decode-integer stream))
-         (class-name (%decode-symbol stream))
+         (class-name (%decode-symbol stream :usage "class"))
          (nslots (%decode-integer stream))
          (class (find-class-with-interactive-renaming class-name))
-         (slot-names (loop repeat nslots collect (%decode-symbol stream)))
+         (slot-names (loop repeat nslots collect (%decode-symbol stream
+                                                                 :intern (not (null class))
+                                                                 :usage "slot")))
          (slots (if class
                     (find-class-slots-with-interactive-renaming class slot-names)
                     slot-names)))

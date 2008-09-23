@@ -278,9 +278,7 @@
     (test-equal o1 (parent-child o2))))
 
 (defdstest abort-anonymous-transaction ()
-  (let (parent)
-    (with-transaction (:initial)
-      (setf parent (make-instance 'parent :child nil)))
+  (let ((parent (make-instance 'parent :child nil)))
     (ignore-errors
       (with-transaction (:abort)
         (setf (parent-child parent) (make-instance 'child))

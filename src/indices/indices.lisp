@@ -295,7 +295,7 @@ the hash-table entry already contains a value, an error is signalled."
 (defmethod index-values ((index array-index))
   (error "An ARRAY-INDEX cannot enumerate its values."))
 
-(defmethod index-mapvalues ((index array-index) fun)
+(defmethod index-mapvalues ((index array-index) (fun function))
   (error "An ARRAY-INDEX cannot enumerate its values."))
 
 (defmethod index-reinitialize ((new-index array-index) (old-index array-index))

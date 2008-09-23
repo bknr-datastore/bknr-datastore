@@ -355,11 +355,41 @@
       (assert (= n (read-sequence buffer stream)))
       (octets-to-string buffer))))
 
-(defun %decode-symbol (stream)
-  (let ((p (%decode-string stream))
-        (n (%decode-string stream)))
-    (intern n (or (find-package p)
-                  (error "package ~A for symbol ~A not found" p n)))))
+(defun find-symbol-in-all-packages (name)
+  (let (symbols)
+    (do-all-symbols (symbol symbols)
+      (when (string-equal symbol name)
+        (pushnew symbol symbols)))))
+
+(defun find-symbol-interactively (package-name symbol-name usage)
+  (let ((keyword (string-equal package-name "KEYWORD")))
+    (restart-case
+        (multiple-value-bind (symbol status)
+            (funcall (if keyword
+                         #'intern
+                         #'find-symbol)
+                     symbol-name
+                     (or (find-package package-name)
+                         (error "package ~A for symbol ~A~@[ naming ~A~] not found" package-name symbol-name usage)))
+          (if (or keyword status)
+              symbol
+              (error "symbol ~A~@[ naming ~A~] not found in package ~A" symbol-name usage package-name)))
+      (use-other-symbol (new-symbol)
+        :interactive (lambda ()
+                       (format t "Enter symbol~@[ (homonyms: ~{~S~^, ~})~]: " (find-symbol-in-all-packages symbol-name))
+                       (let ((new-symbol (ignore-errors (read))))
+                         (list new-symbol)))
+        :report (lambda (stream) (format stream "Use another symbol~@[, homonyms: ~S~]" (find-symbol-in-all-packages symbol-name)))
+        new-symbol)
+      (read-as-nil ()
+        :report "Read symbol as NIL"
+        nil))))
+
+(defun %decode-symbol (stream &key (intern t) usage)
+  (let ((package-name (%decode-string stream))
+        (symbol-name (%decode-string stream)))
+    (when intern
+      (find-symbol-interactively package-name symbol-name usage))))
 
 (defun %decode-list (stream)
   (let* ((n (%decode-integer stream))
@@ -370,7 +400,7 @@
     result))
 
 (defun %decode-hash-table (stream)
-  (let* ((test (%decode-symbol stream))
+  (let* ((test (%decode-symbol stream :usage "hash table test"))
          (rehash-size (%decode-double-float stream))
          (n (%decode-integer stream))
          (result (make-hash-table :test test :size n :rehash-size rehash-size)))
@@ -408,7 +438,7 @@
                                (%decode-uint32 stream)))
 
 (defun %decode-array (stream)
-  (let* ((element-type (%decode-symbol stream))
+  (let* ((element-type (%decode-symbol stream :usage "array element type"))
          (flags (read-byte stream))
          (vectorp (logbitp 0 flags))
          (adjustablep (logbitp 1 flags))
