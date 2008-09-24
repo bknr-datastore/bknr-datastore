@@ -1,4 +1,0 @@
-<!ELEMENT book-resume (#PCDATA)>
-<!ATTLIST book-resume id ID #REQUIRED
-                      book-id CDATA #REQUIRED
-                      reviewer CDATA #REQUIRED>

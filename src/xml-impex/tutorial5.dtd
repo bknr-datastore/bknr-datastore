@@ -1,7 +1,0 @@
-<!ELEMENT book (title)>
-<!ATTLIST book id ID #REQUIRED
-               author CDATA #REQUIRED>
-<!ELEMENT title #PCDATA>
-<!ELEMENT author (name)>
-<!ATTLIST author id ID #REQUIRED>
-<!ELEMENT name #PCDATA>
