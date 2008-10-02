@@ -18,7 +18,8 @@
 
     :depends-on (:cl-interpol :cl-ppcre
 			      :md5
-			      :hunchentoot ; (for hunchentoot-mp package)
+                              :flexi-streams
+                              :bordeaux-threads
 			      :iconv)
 
     :components ((:module "statistics" :components ((:file "package")
