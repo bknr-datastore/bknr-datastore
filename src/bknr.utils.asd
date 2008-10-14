@@ -19,8 +19,7 @@
     :depends-on (:cl-interpol :cl-ppcre
 			      :md5
                               :flexi-streams
-                              :bordeaux-threads
-			      :iconv)
+                              :bordeaux-threads)
 
     :components ((:module "statistics" :components ((:file "package")
 						    (:file "runtime-statistics" :depends-on ("package"))))
