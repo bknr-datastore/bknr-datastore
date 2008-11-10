@@ -35,8 +35,6 @@
            #:parse-time
 
            ;; filesystem functions
-           #:copy-stream
-           #:copy-file
            #:move-file
            #:directory-empty-p
            #:subdir-p

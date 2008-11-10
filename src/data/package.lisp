@@ -3,10 +3,11 @@
 (defpackage :bknr.datastore
   (:use :cl :bknr.utils :cl-interpol :cl-ppcre
         :bknr.indices :bknr.statistics
-        :closer-mop )
+        :closer-mop :alexandria)
   #+cmu
   (:shadowing-import-from :common-lisp #:subtypep #:typep)
   (:shadowing-import-from :cl-interpol quote-meta-chars)
+  (:shadowing-import-from :bknr.indices array-index)
   #|  (:shadow :cl #:get-internal-run-time #:get-internal-real-time #:get-universal-time #:sleep) |#
   (:export #:*store-debug*
            #:*store*

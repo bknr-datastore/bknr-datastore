@@ -163,19 +163,6 @@
 		     0 (length (pathname-directory dir)))
 	     (pathname-directory dir)))))
 
-(defun copy-file (source target &key (overwrite t))
-  (let ((buffer (make-array 4096 :element-type '(unsigned-byte 8)))
-	(read-count 0))
-    (with-open-file (in source :direction :input 
-			:element-type '(unsigned-byte 8))
-      (with-open-file (out target :direction :output 
-			   :element-type '(unsigned-byte 8)
-			   :if-exists (if overwrite :overwrite :error) :if-does-not-exist :create)
-	(loop
-	 (setf read-count (read-sequence buffer in))
-	 (write-sequence buffer out :end read-count)
-	 (when (< read-count 4096) (return)))))))
-
 (defun move-file (file1 file2)
   #+(or allegro openmcl)
   (rename-file file1 file2)
@@ -185,19 +172,6 @@
   #+sbcl
   (sb-unix:unix-rename (namestring file1)
 		       (namestring file2)))
-
-(defun copy-stream (in out &optional (element-type '(unsigned-byte 8)))
-  "Copy everything from in to out"
-  (let* ((buffer-size 4096)
-	 (buffer (make-array buffer-size :element-type element-type)))
-    (labels ((read-chunks ()
-			  (let ((size (read-sequence buffer in)))
-			    (if (< size buffer-size)
-				(write-sequence buffer out :start 0 :end size)
-			      (progn
-				(write-sequence buffer out)
-				(read-chunks))))))
-      (read-chunks))))
 
 (defun make-temporary-pathname (&key (defaults nil) (name "tmp"))
   (loop for file = (make-pathname :name (format nil "~A-~A-~A"
