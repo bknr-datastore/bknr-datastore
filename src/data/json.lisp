@@ -6,7 +6,7 @@
   `(let ((*ignore-slots* (append *ignore-slots* ,slots)))
      ,@body))
 
-(defmethod json:encode ((object store-object) stream)
+(defmethod json:encode ((object store-object) &optional (stream *standard-output*))
   (json:with-output (stream)
     (json:with-object ()
       (dolist (slotdef (closer-mop:class-slots (class-of object)))
