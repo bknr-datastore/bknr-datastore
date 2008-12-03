@@ -22,6 +22,7 @@
                :unit-test
                :bknr.utils
                :bknr.indices
+               :yason
                :trivial-utf-8)
 
   :components ((:module "data" :components ((:file "package")

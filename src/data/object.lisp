@@ -282,6 +282,12 @@ reads will return nil."))
   ;; running the transaction log.
   (initialize-transient-instance object))
 
+(defmacro print-store-object ((object stream &key type) &body body)
+  ;; variable capture accepted here.
+  `(print-unreadable-object (,object ,stream :type ,type)
+     (format stream "ID: ~D " (store-object-id ,object))
+     ,@body))
+
 (defmethod print-object ((object store-object) stream)
   (print-unreadable-object (object stream :type t)
     (format stream "ID: ~D" (store-object-id object))))

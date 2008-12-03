@@ -56,6 +56,7 @@
            #:store-object-id
            #:store-object-last-change
            #:store-object-touch
+           #:print-store-object
 
            #:delete-object
            #:delete-objects
