@@ -23,7 +23,8 @@
                :bknr.utils
                :bknr.indices
                :yason
-               :trivial-utf-8)
+               :trivial-utf-8
+               #+sbcl :sb-posix)
 
   :components ((:module "data" :components ((:file "package")
                                             (:file "encoding" :depends-on ("package"))
