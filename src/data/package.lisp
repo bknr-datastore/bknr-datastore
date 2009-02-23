@@ -22,10 +22,6 @@
            #:sleep
            |#
 
-           ;; session
-           #:session
-           #:session-status
-
            ;; store
            #:store
            #:mp-store
