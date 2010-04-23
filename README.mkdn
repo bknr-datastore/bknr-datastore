@@ -1,0 +1,23 @@
+# bknr.datastore
+
+Precompiled bknr (and bknr.datastore) documentation can be found at [bknr's home-page](http://bknr.net/html/home.html).  Uncompiled documentation is enclosed in this repository.
+
+# installing through clbuild
+
+In order to install bknr through clbuild, you should add (at least) the following:
+
+    my-projects
+    -----------
+    alexandria              get_git git://common-lisp.net/projects/alexandria/alexandria.git
+    bknr-datastore          get_git git://github.com/madnificent/bknr-datastore.git # if the changes for closer-mop get added by Hans Huebner use you'd better use http://github.com/hanshuebner/bknr-datastore.git for the original sources
+    yason                   get_svn svn://bknr.net/svn/trunk/libraries/yason/
+    unit-test               get_svn svn://bknr.net/svn/trunk/thirdparty/unit-test
+
+    my-dependencies (only for bknr-datastore itself)
+    ---------------
+    bknr-datastore alexandria arnesi babel bordeaux-threads cl-interpol cl-store cl-unicode closer-mop closure-common cxml fiveam flexi-streams lift md5 puri trivial-features trivial-gray-streams trivial-utf-8 unit-test yason
+
+    at the terminal
+    ---------------
+    ./clbuild install bknr-datastore
+    ./clbuild lisp --eval "(require 'bknr.datastore)"
