@@ -6,6 +6,7 @@
         :closer-mop :alexandria)
   #+cmu
   (:shadowing-import-from :common-lisp #:subtypep #:typep)
+  (:shadowing-import-from :closer-mop defmethod defgeneric standard-generic-function)
   (:shadowing-import-from :cl-interpol quote-meta-chars)
   (:shadowing-import-from :bknr.indices array-index)
   #|  (:shadow :cl #:get-internal-run-time #:get-internal-real-time #:get-universal-time #:sleep) |#
