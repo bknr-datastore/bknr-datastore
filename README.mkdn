@@ -9,7 +9,7 @@ In order to install bknr through clbuild, you should add (at least) the followin
     my-projects
     -----------
     alexandria              get_git git://common-lisp.net/projects/alexandria/alexandria.git
-    bknr-datastore          get_git git://github.com/madnificent/bknr-datastore.git # if the changes for closer-mop get added by Hans Huebner use you'd better use http://github.com/hanshuebner/bknr-datastore.git for the original sources
+    bknr-datastore          get_git http://github.com/hanshuebner/bknr-datastore.git
     yason                   get_svn svn://bknr.net/svn/trunk/libraries/yason/
     unit-test               get_svn svn://bknr.net/svn/trunk/thirdparty/unit-test
 
