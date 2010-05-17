@@ -595,7 +595,7 @@ transaction, if any."
                    :log-buffer (flex:make-in-memory-input-stream buffer))))
 
 (define-condition rollback-failed (error)
-  ((transaction :initarg transaction)
+  ((transaction :initarg :transaction)
    (original-error :initarg :original-error))
   (:report (lambda (e stream)
              (with-slots (transaction original-error) e

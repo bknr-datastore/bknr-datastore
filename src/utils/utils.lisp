@@ -6,7 +6,7 @@
                            ,@(when doc (list doc))))
 ;;; date format
 
-;; Zeitzone für Mail-Zeitstempel
+;; Zeitzone fuer Mail-Zeitstempel
 (defparameter *mail-timezone* "+0100")
 
 (defun format-date-time (&optional universal-time &key stream
