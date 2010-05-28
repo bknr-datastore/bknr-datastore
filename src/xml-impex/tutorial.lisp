@@ -35,7 +35,7 @@
 ;;; BKNR to your `asdf:*central-registry*', and load the indices
 ;;; module by evaluating the following form:
 
-(asdf:oos 'asdf:load-op :bknr-impex)
+(asdf:oos 'asdf:load-op :bknr.impex)
 
 ;;; Then switch to the `bknr.impex' package to try out the tutorial.
 
@@ -90,17 +90,21 @@
 ;;; class, and by specifying the XML element corresponding to the
 ;;; class. We also annotate the slot definitions.
 
-(defvar *tutorial-dtd* "xml-impex/tutorial.dtd")
+;;; If we have evaluated the previous book definition we must reset it now
+;;; before proceeding:
+(setf (find-class 'book) nil)
+
+(defvar *tutorial-dtd* "../xml-impex/tutorial.dtd")
 
 (defclass book ()
   ((author :initarg :author :reader book-author
-	   :element "author")
+           :element "author")
    (id :initarg :id :reader book-id :type integer
        :attribute "id" :parser #'parse-integer)
    (isbn :initarg :isbn :reader book-isbn
-	 :attribute "isbn")
+         :attribute "isbn")
    (title :initarg :title :reader book-title
-	  :element "title"))
+          :element "title"))
   (:metaclass xml-class)
   (:dtd-name *tutorial-dtd*)
   (:element "book"))
@@ -110,14 +114,14 @@
 ;;; get back a list containing all the children nodes of `books' under
 ;;; the keyword `:BOOK'.
 
-(parse-xml-file "xml-impex/tutorial.xml" (list (find-class 'book)))
+(parse-xml-file "../xml-impex/tutorial.xml" (list (find-class 'book)))
 ; => (:BOOK
 ;     (#<BOOK ("The Lord of the Rings") {4922BCD5}>
 ;      #<BOOK ("Neuromancer") {4922E0B5}>))
 (setf *books*
-      (getf (parse-xml-file "xml-impex/tutorial.xml"
-			    (list (find-class 'book)))
-	    :BOOK))
+      (getf (parse-xml-file "../xml-impex/tutorial.xml"
+                            (list (find-class 'book)))
+            :BOOK))
 ; => (#<BOOK ("The Lord of the Rings") {4922BCD5}>
 ;     #<BOOK ("Neuromancer") {4922E0B5}>)
 
@@ -145,20 +149,20 @@
 
 (defclass book ()
   ((author :initarg :author :reader book-author
-	   :element "author"
-	   :index-type hash-index :index-initargs (:test #'equal)
-	   :index-reader books-with-author
-	   :index-keys all-authors)
+           :element "author"
+           :index-type hash-index :index-initargs (:test #'equal)
+           :index-reader books-with-author
+           :index-keys all-authors)
    (id :initarg :id :reader book-id :type integer
        :attribute "id" :parser #'parse-integer
        :index-type unique-index :index-reader book-with-id
        :index-values all-books)
    (isbn :initarg :isbn :reader book-isbn
-	 :attribute "isbn"
-	 :index-type unique-index :index-initargs (:test #'equal)
-	 :index-reader book-with-isbn)
+         :attribute "isbn"
+         :index-type unique-index :index-initargs (:test #'equal)
+         :index-reader book-with-isbn)
    (title :initarg :title :reader book-title
-	  :element "title"))
+          :element "title"))
   (:metaclass xml-class)
   (:dtd-name *tutorial-dtd*)
   (:element "book"))
@@ -166,7 +170,7 @@
 ;;; We can now import our XML file and the indices will automatically
 ;;; get filled. The indices change nothing to the serialization.
 
-(parse-xml-file "xml-impex/tutorial.xml" (list (find-class 'book)))
+(parse-xml-file "../xml-impex/tutorial.xml" (list (find-class 'book)))
 ; => (:BOOK
 ;     (#<BOOK "The Lord of the Rings" {49224D25}>
 ;      #<BOOK "Neuromancer" {492272CD}>))
@@ -242,7 +246,7 @@
 
 ;;; We can then write the following class definitions:
 
-(defvar *test-dtd* "xml-impex/tutorial2.dtd")
+(defvar *test-dtd* "../xml-impex/tutorial2.dtd")
 
 (defclass test-object ()
   ((id :initarg :id :attribute "id"
@@ -283,8 +287,8 @@
 
 ;;; When we parse a sample file, we get the following results:
 
-(parse-xml-file "xml-impex/tutorial2.xml"
-		(mapcar #'find-class '(test test2 test3)))
+(parse-xml-file "../xml-impex/tutorial2.xml"
+                (mapcar #'find-class '(test test2 test3)))
 ; => (:TEST3 (#<TEST3 3>) :TEST2 (#<TEST2 2>)
 ;     :TEST (#<TEST 1>))
 (all-objects)
@@ -329,13 +333,14 @@
 
 ;;; we can write the following class definition:
 
-(defvar *adult-dtd* "xml-impex/tutorial3.dtd")
+(defvar *adult-dtd* "../xml-impex/tutorial3.dtd")
 
 (defclass adult ()
   ((name :initarg :name :attribute "name"
-	 :reader adult-name)
+         :reader adult-name)
    (children :initarg :children :element "child"
-	     :reader adult-children))
+             :reader adult-children :containment :*))
+
   (:metaclass xml-class)
   (:dtd-name *adult-dtd*)
   (:element "adult"))
@@ -346,7 +351,7 @@
 
 (defclass child ()
   ((name :initarg :name :attribute "name"
-	 :reader child-name))
+         :reader child-name))
   (:metaclass xml-class)
   (:dtd-name *adult-dtd*)
   (:element "child"))
@@ -369,11 +374,12 @@
 </family>
 
 (setf *adults* 
-      (getf (parse-xml-file "xml-impex/tutorial3.xml"
-			    (mapcar #'find-class '(adult child)))
-	    :adult))
+      (getf (parse-xml-file "../xml-impex/tutorial3.xml"
+                            (mapcar #'find-class '(adult child)))
+            :adult))
 ; => (#<ADULT Clara> #<ADULT Joseph>)
-(adult-children (first *))
+(adult-children (first *adults*))
+
 ; => (#<CHILD Robert> #<CHILD Anton>)
 (write-to-xml *adults* :name "family")
 ; => <family>
@@ -396,21 +402,21 @@
 
 (defclass child ()
   ((name :initarg :name :attribute "name"
-	 :reader child-name)
+         :reader child-name)
    (parent :initarg :parent :parent t
-	   :reader child-parent))
+           :reader child-parent))
   (:metaclass xml-class)
   (:dtd-name *adult-dtd*)
   (:element "child"))
 
 (setf *adults* 
-      (getf (parse-xml-file "xml-impex/tutorial3.xml"
-			    (mapcar #'find-class '(adult child)))
-	    :adult))
+      (getf (parse-xml-file "../xml-impex/tutorial3.xml"
+                            (mapcar #'find-class '(adult child)))
+            :adult))
 ; => (#<ADULT Joseph> #<ADULT Clara>)
 (adult-children (first *adults*))
 ; => (#<CHILD Benediktine> #<CHILD Ludwig>)
-(child-parent (first *))
+(child-parent (first (adult-children (first *adults*))))
 ; => #<ADULT Joseph>
 
 ;;;### The :body slot option
@@ -426,19 +432,19 @@
                       book-id CDATA #REQUIRED
                       reviewer CDATA #REQUIRED>
 
-(defvar *resume-dtd* "xml-impex/tutorial4.dtd")
+(defvar *resume-dtd* "../xml-impex/tutorial4.dtd")
 
 (defclass book-resume ()
   ((id :initarg :id :attribute "id"
        :parser #'parse-integer
        :reader book-resume-id)
    (book-id :initarg :book-id :attribute "book-id"
-	    :parser #'parse-integer
-	    :reader book-resume-book-id)
+            :parser #'parse-integer
+            :reader book-resume-book-id)
    (reviewer :initarg :reviewer :attribute "reviewer"
-	     :reader book-resume-reviewer)
+             :reader book-resume-reviewer)
    (review :initarg :review :body t
-	   :reader book-resume-review))
+           :reader book-resume-review))
   (:metaclass xml-class)
   (:dtd-name *resume-dtd*)
   (:element "book-resume"))
@@ -457,11 +463,11 @@ Bl4 bl4 bl4. R3s\/m3 h1ghl1ght bl4bl4bl4 f00b4r bl0rg.
 </resumes>
 
 (setf *resumes*
-      (getf (parse-xml-file "xml-impex/tutorial4.xml"
-			    (list (find-class 'book-resume)))
-	    :book-resume))
+      (getf (parse-xml-file "../xml-impex/tutorial4.xml"
+                            (list (find-class 'book-resume)))
+            :book-resume))
 ; => (#<BOOK-RESUME {4947F22D}> #<BOOK-RESUME {4947DB95}>)
-(book-resume-review (first *))
+(book-resume-review (first *resumes*))
 ; => "
 ; Bl4 bl4 bl4. R3s\\/m3 h1ghl1ght bl4bl4bl4 f00b4r bl0rg.
 ; "
@@ -494,7 +500,7 @@ Bl4 bl4 bl4. R3s\/m3 h1ghl1ght bl4bl4bl4 f00b4r bl0rg.
 
 ;;; We can write the following class definitions:
 
-(defparameter *book2-dtd* "xml-impex/tutorial5.dtd")
+(defparameter *book2-dtd* "../xml-impex/tutorial5.dtd")
 
 (defclass author ()
   ((id :initarg :id :reader author-id
@@ -502,7 +508,7 @@ Bl4 bl4 bl4. R3s\/m3 h1ghl1ght bl4bl4bl4 f00b4r bl0rg.
        :index-type unique-index :index-reader author-with-id
        :index-values all-authors)
    (name :initarg :name :reader author-name
-	 :element "name"))
+         :element "name"))
   (:metaclass xml-class)
   (:dtd-name *book2-dtd*)
   (:element "author"))
@@ -517,11 +523,11 @@ Bl4 bl4 bl4. R3s\/m3 h1ghl1ght bl4bl4bl4 f00b4r bl0rg.
        :index-type unique-index :index-reader book-with-id
        :index-values all-books)
    (author :initarg :author :reader book-author
-	  :attribute "author" :parser #'parse-integer
-	  :id-to-object #'author-with-id
-	  :object-to-id #'author-id)
+          :attribute "author" :parser #'parse-integer
+          :id-to-object #'author-with-id
+          :object-to-id #'author-id)
    (title :initarg :title :reader book-title
-	  :element "title"))
+          :element "title"))
   (:metaclass xml-class)
   (:dtd-name *book2-dtd*)
   (:element "book"))
@@ -546,8 +552,8 @@ Bl4 bl4 bl4. R3s\/m3 h1ghl1ght bl4bl4bl4 f00b4r bl0rg.
 (map nil #'clear-class-indices
      (mapcar #'find-class '(book author)))
 ; => NIL
-(parse-xml-file "xml-impex/tutorial5.xml"
-		(mapcar #'find-class '(book author)))
+(parse-xml-file "../xml-impex/tutorial5.xml"
+                (mapcar #'find-class '(book author)))
 ; => (:BOOK
 ;     (#<BOOK "Neuromancer" {494AEFC5}>
 ;      #<BOOK "Lord of the Rings" {494AD48D}>)
@@ -558,10 +564,10 @@ Bl4 bl4 bl4. R3s\/m3 h1ghl1ght bl4bl4bl4 f00b4r bl0rg.
 (all-books)
 ; => (#<BOOK "Lord of the Rings" {494AD48D}>
 ;     #<BOOK "Neuromancer" {494AEFC5}>)
-(book-author (first *))
+(book-author (first (all-books)))
 ; => #<AUTHOR J.R.R Tolkien>
 (write-to-xml (append (all-books) (all-authors))
-	      :name "library")
+              :name "library")
 ; => <library>
 ;       <book author="1" id="3">
 ;          <title>Lord of the Rings</title>

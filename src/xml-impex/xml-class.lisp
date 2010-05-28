@@ -3,13 +3,14 @@
 (defclass xml-class (indexed-class)
   ((element :initarg :element :initform nil :accessor xml-class-element)
    (unique-id-slot   :initarg :unique-id-slot :initform nil
-		     :documentation "if set to a slot name, this
+                     :documentation "if set to a slot name, this
 signals that the slot can be used as a unique id to refer to an
 instance of the object in a n XML update operation")
    (unique-id-reader :initarg :unique-id-reader :initform nil
-		     :documentation "if set to a function, this
+                     :documentation "if set to a function, this
 signals that the function can be used as a unique index-reader when
-used in XML update operations.")))
+used in XML update operations.")
+   (dtd-name :reader xml-class-dtd-name)))
 
 (defmethod xml-class-unique-id-slot ((class xml-class))
   (first (slot-value class 'unique-id-slot)))
@@ -53,11 +54,11 @@ once.  Further occurances of the same object will be referenced
 through the object-id-slot (either an element or an attribute)")
 
    (id-to-object :initarg :id-to-object
-		 :initform nil
-		 :documentation "Function used to get the value pointed to by the ID.")
+                 :initform nil
+                 :documentation "Function used to get the value pointed to by the ID.")
    (object-to-id :initarg :object-to-id
-		 :initform nil
-		 :documentation "Function used to get the ID of the object stored in the slot.")
+                 :initform nil
+                 :documentation "Function used to get the ID of the object stored in the slot.")
 
    (parent :initarg :parent
            :initform nil
@@ -84,58 +85,60 @@ through the object-id-slot (either an element or an attribute)")
   (print-unreadable-object (slot stream :type t :identity t)
     (with-slots (attribute element body parent) slot
       (format stream "~A (~A~@[ ~S~])" (slot-definition-name slot)
-	      (cond (attribute "ATTRIBUTE")
-		    (element "ELEMENT")
-		    (body "BODY")
-		    (parent "PARENT")
-		    (t "UNKNOWN"))
-	      (or attribute element)))))
+              (cond (attribute "ATTRIBUTE")
+                    (element "ELEMENT")
+                    (body "BODY")
+                    (parent "PARENT")
+                    (t "UNKNOWN"))
+              (or attribute element)))))
 
 (defmethod xml-class-attribute-slots ((class xml-class))
   (remove-if #'(lambda (slot)
-		 (or (not (typep slot 'xml-effective-slot-definition))
-		     (not (slot-value slot 'attribute)))) (class-slots class)))
+                 (or (not (typep slot 'xml-effective-slot-definition))
+                     (not (slot-value slot 'attribute)))) (class-slots class)))
 
 (defmethod xml-class-element-slots ((class xml-class))
   (remove-if #'(lambda (slot)
-		 (or (not (typep slot 'xml-effective-slot-definition))
-		     (not (slot-value slot 'element)))) (class-slots class)))
+                 (or (not (typep slot 'xml-effective-slot-definition))
+                     (not (slot-value slot 'element)))) (class-slots class)))
 
 (defmethod xml-class-body-slot ((class xml-class))
   (let ((body-slots
-	 (remove-if #'(lambda (slot)
-			(or (not (typep slot 'xml-effective-slot-definition))
-			    (not (slot-value slot 'body)))) (class-slots class))))
+         (remove-if #'(lambda (slot)
+                        (or (not (typep slot 'xml-effective-slot-definition))
+                            (not (slot-value slot 'body)))) (class-slots class))))
     (when (> (length body-slots) 1)
       (error "Class ~A has more than one body slot: ~A." class body-slots))
     (first body-slots)))
 
 (defmethod xml-class-find-attribute-slot ((class xml-class) attribute)
   (find attribute (xml-class-attribute-slots class)
-	:test #'string-equal
-	:key #'(lambda (slot) (slot-value slot 'attribute))))
+        :test #'string-equal
+        :key #'(lambda (slot) (slot-value slot 'attribute))))
 
 (defmethod xml-class-find-element-slot ((class xml-class) element)
   (find element (xml-class-element-slots class)
-	:test #'string-equal
-	:key #'(lambda (slot) (slot-value slot 'element))))
+        :test #'string-equal
+        :key #'(lambda (slot) (slot-value slot 'element))))
 
 (defmethod xml-class-parent-slot ((class xml-class))
   (let ((parent-slots
-	 (remove-if #'(lambda (slot)
-			(or (not (typep slot 'xml-effective-slot-definition))
-			    (not (slot-value slot 'parent))))
-		    (class-slots class))))
+         (remove-if #'(lambda (slot)
+                        (or (not (typep slot 'xml-effective-slot-definition))
+                            (not (slot-value slot 'parent))))
+                    (class-slots class))))
     (when (> (length parent-slots) 1)
       (error "Class ~A has more than one parent slot: ~A." class parent-slots))
     (first parent-slots)))
 
-(defmethod initialize-instance :after ((class xml-class) &key element &allow-other-keys)
-  (setf (xml-class-element class) (or (first element) (string-downcase (class-name class))))
+(defmethod initialize-instance :after ((class xml-class) &key element dtd-name)
+  (setf (slot-value class 'dtd-name) (symbol-value (first dtd-name))
+        (xml-class-element class) (or (first element) (string-downcase (class-name class))))
   (xml-class-finalize class))
 
-(defmethod reinitialize-instance :after ((class xml-class) &key element &allow-other-keys)
-  (setf (xml-class-element class) (or (first element) (string-downcase (class-name class))))
+(defmethod reinitialize-instance :after ((class xml-class) &key element dtd-name)
+  (setf (slot-value class 'dtd-name) (symbol-value (first dtd-name))
+        (xml-class-element class) (or (first element) (string-downcase (class-name class))))
   (xml-class-finalize class))
 
 (defmethod xml-class-finalize ((class xml-class))
@@ -155,8 +158,8 @@ through the object-id-slot (either an element or an attribute)")
 
 (defmethod compute-effective-slot-definition :around ((class xml-class) name direct-slots)
   (let* ((xml-directs (remove-if-not #'(lambda (class) (typep class 'xml-direct-slot-definition))
-				     direct-slots))
-	 (xml-direct (first xml-directs)))
+                                     direct-slots))
+         (xml-direct (first xml-directs)))
 
     ;; Commented out this check because I could not determine what it does and it warned me.
     #+(or)
@@ -167,32 +170,32 @@ through the object-id-slot (either an element or an attribute)")
 
     (let ((normal-slot (call-next-method)))
       (when (and xml-direct
-		 (typep normal-slot 'xml-effective-slot-definition))
-	(with-slots (attribute element body parent) xml-direct
-	  (when (> (length (remove nil (list parent element attribute body))) 1)
-	    (error "Only one of ELEMENT, ATTRIBUTE, PARENT or BODY is possible for a slot definition."))
-	  (unless (or body parent)
-	    (unless (or element attribute)
-	      (setf element (string-downcase name)))
-	    (when element
-	      (setf element (if (eq t element) (string-downcase name) element)))
-	    (when attribute
-	      (setf attribute (if (eq t attribute) (string-downcase name) attribute)))
-	    (unless (or element attribute)
-	      (error "Could not find element or attribute for slot ~A." name))))
+                 (typep normal-slot 'xml-effective-slot-definition))
+        (with-slots (attribute element body parent) xml-direct
+          (when (> (length (remove nil (list parent element attribute body))) 1)
+            (error "Only one of ELEMENT, ATTRIBUTE, PARENT or BODY is possible for a slot definition."))
+          (unless (or body parent)
+            (unless (or element attribute)
+              (setf element (string-downcase name)))
+            (when element
+              (setf element (if (eq t element) (string-downcase name) element)))
+            (when attribute
+              (setf attribute (if (eq t attribute) (string-downcase name) attribute)))
+            (unless (or element attribute)
+              (error "Could not find element or attribute for slot ~A." name))))
 
         ;; copy direct-slot-definition slots to effective-slot-definition
-	(dolist (slot '(parser serializer body id-to-object object-to-id
-			parent attribute element containment))
-	  (setf (slot-value normal-slot slot)
-		(slot-value xml-direct slot))))
+        (dolist (slot '(parser serializer body id-to-object object-to-id
+                        parent attribute element containment))
+          (setf (slot-value normal-slot slot)
+                (slot-value xml-direct slot))))
 
       (dolist (slot '(parser serializer object-id-slot object-to-id id-to-object) normal-slot)
-	(let ((value (slot-value normal-slot slot)))
-	  (when value
-	    (setf (slot-value normal-slot slot)
-		  (eval value)))))
-	
+        (let ((value (slot-value normal-slot slot)))
+          (when value
+            (setf (slot-value normal-slot slot)
+                  (eval value)))))
+        
       normal-slot)))
 
 (defmethod xml-object-check-validity (object)
@@ -201,13 +204,13 @@ through the object-id-slot (either an element or an attribute)")
       (error "Object ~a is not of metaclass XML-CLASS." object))
     (dolist (slot (class-slots class))
       (when (typep slot 'xml-effective-slot-definition)
-	(when (and (xml-effective-slot-definition-required-p slot)
-		   (not (slot-boundp object (slot-definition-name slot))))
-	  (error "Required slot ~A is not bound in ~a."
-		 (slot-definition-name slot) object))
-	(let ((containment (xml-effective-slot-definition-containment slot)))
-	  (when (and containment
-		     (eql containment :+)
-		     (null (slot-value object (slot-definition-name slot))))
-	    (error "Slot ~a with containment :+ has no value."
-		   (slot-definition-name slot))))))))
+        (when (and (xml-effective-slot-definition-required-p slot)
+                   (not (slot-boundp object (slot-definition-name slot))))
+          (error "Required slot ~A is not bound in ~a."
+                 (slot-definition-name slot) object))
+        (let ((containment (xml-effective-slot-definition-containment slot)))
+          (when (and containment
+                     (eql containment :+)
+                     (null (slot-value object (slot-definition-name slot))))
+            (error "Slot ~a with containment :+ has no value."
+                   (slot-definition-name slot))))))))
