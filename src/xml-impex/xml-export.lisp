@@ -67,7 +67,6 @@
                 (if (gethash (slot-value object (first unique-id-slot)) *objects-written*)
                     (progn
                       (write-object-reference class object (first unique-id-slot) qname)
-;                     (return-from write-to-xml))
                       (return-from build-xml))
                     (setf (gethash (slot-value object (first unique-id-slot)) *objects-written*) t))))
             
@@ -114,13 +113,9 @@
                       (funcall (xml-effective-slot-definition-serializer body-slot)
                                (slot-value object name)))))))
         
-              (sax:end-element cxml::*sink* nil nil qname)
-              )))
+              (sax:end-element cxml::*sink* nil nil qname))))
         (cxml:with-element (string-downcase (class-name (class-of object)))
           (dolist (slot (class-slots (class-of object)))
-            (princ (string-downcase (symbol-name (slot-definition-name slot))))
-            (princ (class-of object))
-            (terpri)
             (cxml:with-element (string-downcase (symbol-name (slot-definition-name slot)))
               (let ((value (slot-value object (slot-definition-name slot))))
                 (when value
