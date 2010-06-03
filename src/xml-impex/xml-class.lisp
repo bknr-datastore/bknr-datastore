@@ -141,6 +141,17 @@ through the object-id-slot (either an element or an attribute)")
         (xml-class-element class) (or (first element) (string-downcase (class-name class))))
   (xml-class-finalize class))
 
+(defun get-dtd (dtd)
+  (cond ((or (stringp dtd)
+             (pathnamep dtd))
+         (cxml:parse-dtd-file dtd))
+        ((typep dtd 'cxml::dtd) dtd)
+        (t (let ((dtd (eval dtd)))
+             (unless (typep dtd 'cxml::dtd)
+;               (error "DTD ~A is not a CXML dtd." dtd))
+               (warn "DTD ~A is not a CXML dtd." dtd))
+             dtd))))
+
 (defun get-dtd-elmdef (dtd elmdef)
   "Finds an element definition in a DTD. Returns a cxml:elmdef"
   (typecase elmdef
@@ -186,10 +197,11 @@ pairs, representing the childs and their containment definition"
 (defmethod xml-class-finalize ((class xml-class))
   (unless (class-finalized-p class)
     (finalize-inheritance class))
-
-  (let ((slots (class-slots class))
-        (elmdef (get-dtd-elmdef 
-                 (cxml::parse-dtd-file (xml-class-dtd-name class)) (xml-class-element class))))
+  
+  (let* ((slots (class-slots class))
+         (dtd (get-dtd (xml-class-dtd-name class))) 
+         (elmdef (when dtd (get-dtd-elmdef dtd (xml-class-element class)))))
+    
     (unless elmdef
       (return-from xml-class-finalize))
     ;;; check attributes
