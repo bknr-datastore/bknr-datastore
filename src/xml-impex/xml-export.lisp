@@ -14,9 +14,13 @@
          (cxml::*current-element* nil)
          (sink (cxml:make-character-stream-sink ,output :indentation ,indentation :canonical ,canonical)))
      (with-xml-output sink
-       (build-xml ,object :name ,name))
-     ))
-       
+       (build-xml ,object :name ,name))))
+
+(defmacro write-to-xml-string (object &key name (indentation 3) (canonical nil))
+  `(let ((output-string (make-string-output-stream)))
+     (get-output-stream-string
+      (write-to-xml ,object :name ,name :output output-string :indentation ,indentation :canonical ,canonical))))
+
 (defmacro with-xml-export* ((&key output indentation canonical) &body body)
   `(let ((*objects-written* (make-hash-table :test #'equal))
          (cxml::*current-element* nil)

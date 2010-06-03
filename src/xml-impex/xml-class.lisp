@@ -141,10 +141,81 @@ through the object-id-slot (either an element or an attribute)")
         (xml-class-element class) (or (first element) (string-downcase (class-name class))))
   (xml-class-finalize class))
 
+(defun get-dtd-elmdef (dtd elmdef)
+  "Finds an element definition in a DTD. Returns a cxml:elmdef"
+  (typecase elmdef
+    (string (unless dtd
+              (error "Can not find elmdef ~a in dtd ~A." elmdef dtd))
+            (cxml::find-element (cxml::string-rod elmdef) dtd))
+    (cxml::elmdef elmdef)
+    (t (let ((elmdef (eval elmdef)))
+         (unless (typep elmdef 'cxml::elmdef)
+           (error "Elmdef ~A is not a CXML elmdef." elmdef))
+         elmdef))))
+
+(defmethod elmdef-children ((elmdef cxml::elmdef))
+  "Analyses the content field of a given elmdef and returns a list of element/containment
+pairs, representing the childs and their containment definition"
+  (let (result)
+    (labels ((elmdef-children-rec (content containment)
+               (format t "~S content containmnt ~S~%" content containment)
+               (cond ((and (listp content)
+                           (member (first content) '(cxml::and cxml::or)))
+                      (dolist (child (cdr content))
+                        (elmdef-children-rec child containment)))
+                     ((and (listp content)
+                           (eql (first content) 'cxml::+))
+                      (dolist (child (cdr content))
+                        (elmdef-children-rec child :+)))
+                     ((and (listp content)
+                           (eql (first content) 'cxml::*))
+                      (dolist (child (cdr content))
+                        (elmdef-children-rec child :*)))
+                     ((and (listp content)
+                           (eql (first content) 'cxml::?))
+                      (dolist (child (cdr content))
+                        (elmdef-children-rec child :optional)))
+                     ((listp content)
+                      (error "Unknown content form ~S (missing element declaration for ~S in DTD?)." content (cxml::elmdef-name elmdef)))
+                     ((eql content :pcdata))
+                     ((eql content :empty))
+                     (t (push (list content containment) result)))))
+      (elmdef-children-rec (cxml::elmdef-content elmdef) :single)
+      (nreverse result))))
+
 (defmethod xml-class-finalize ((class xml-class))
   (unless (class-finalized-p class)
     (finalize-inheritance class))
 
+  (let ((slots (class-slots class))
+        (elmdef (get-dtd-elmdef 
+                 (cxml::parse-dtd-file (xml-class-dtd-name class)) (xml-class-element class))))
+    (unless elmdef
+      (return-from xml-class-finalize))
+    ;;; check attributes
+    (dolist (attr (cxml::elmdef-attributes elmdef))
+      (let ((attr-name (cxml::rod-string (cxml::attdef-name attr))))
+        (when (eql (cxml::attdef-default attr) :required)
+          (let ((slot (xml-class-find-attribute-slot class attr-name)))
+            (when (not slot)
+              (warn "Could not find slot for required attribute ~A." attr-name))))))
+    ;;; check elements
+    (dolist (child (elmdef-children elmdef))
+      (let* ((child-name (cxml::rod-string (first child)))
+             (child-containment (second child))
+             (slot (xml-class-find-element-slot class child-name)))
+        (if slot
+            (with-slots (containment required-p) slot
+              (if containment
+                  (when (not (eql containment child-containment))
+                    (error "Slot containment ~A is not the same as the child containment ~A."
+                           containment child-containment))
+                  (setf containment child-containment))
+              (when (member child-containment '(:single :+))
+                (setf required-p t)))
+            (when (member child-containment '(:single :+))
+              (warn "Could not find a slot for the child element ~A with containment ~A."
+                    child-name child-containment))))))
   (class-slots class))
 
 (defmethod direct-slot-definition-class ((class xml-class) &key parent attribute element body &allow-other-keys)
