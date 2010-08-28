@@ -1,12 +1,11 @@
 (in-package :cl-user)
 
 (defpackage :bknr.impex
-  (:use :cl
-	:cxml
-	:closer-mop
-	:bknr.utils
-	:bknr.xml
-	:bknr.indices)
+  (:use :cxml
+        :closer-common-lisp
+        :bknr.utils
+        :bknr.xml
+        :bknr.indices)
   #+cmu
   (:shadowing-import-from :common-lisp #:subtypep #:typep)
 
