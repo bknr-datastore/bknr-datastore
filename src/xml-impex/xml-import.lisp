@@ -82,8 +82,6 @@
           ;; parse the value if necessary
           (setf value (slot-parse-value slot value))
           (let ((containment (xml-effective-slot-definition-containment slot)))
-            ;; FIXME: the documentation omits the need to specify the containment slot 
-            ;; Either make it a requirement of initialise it from the dtd (?)
             (if (member containment '(:* :+))
                 ;; if it has a plural containment, push the
                 ;; created instance into the initargs hash
