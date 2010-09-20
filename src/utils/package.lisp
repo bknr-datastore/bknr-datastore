@@ -31,6 +31,10 @@
            #:next-day
            #:month-num-days
 
+	   ;; shell functions
+	   #:run-shell-command-to-string
+	   #:run-shell-command
+	   
            #:hostname
            #:parse-time
 
