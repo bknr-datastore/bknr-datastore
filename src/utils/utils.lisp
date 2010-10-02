@@ -9,11 +9,14 @@
 ;; Zeitzone fuer Mail-Zeitstempel
 (defparameter *mail-timezone* "+0100")
 
+(defun month-name (month)
+  (elt #("Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec") (1- month)))
+
 (defun format-date-time (&optional universal-time &key stream
 			 (show-year t) (show-month t)
 			 (show-date t) (show-time t) (show-weekday nil)
 			 (show-seconds t)
-			 vms-style mail-style xml-style js-style)
+			 vms-style us-style mail-style xml-style js-style)
   (or show-date show-time
       (warn "format-date-time: show-date and show-time are nil, nothing printed"))
   (multiple-value-bind (sec min hour day month year weekday)
@@ -27,8 +30,11 @@
 	(mail-style
 	 (format s "~A, ~2,'0D ~A ~4D ~2,'0D:~2,'0D:~2,'0D ~A"
 		 (elt #("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun") weekday)
-		 day (elt #("Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec") (1- month)) year
+		 day (month-name month) year
 		 hour min sec *mail-timezone*))
+	(us-style
+	 (format s "~A ~2,'0D, ~A"
+		 (month-name month) day year))
 	(vms-style
 	 (when show-date
 	   (setf month (nth (- month 1) '("JAN" "FEB" "MAR" "APR" "MAY" "JUN" "JUL" "AUG" "SEP" "OCT" "NOV" "DEC")))
