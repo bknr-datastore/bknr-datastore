@@ -16,7 +16,7 @@
   :description "CLOS class indices"
   :long-description ""
 
-  :depends-on (:cl-interpol :bknr.utils :bknr.skip-list)
+  :depends-on (:cl-interpol :bknr.utils :bknr.skip-list :closer-mop)
 
   :components ((:module "indices"
 			:components

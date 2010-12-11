@@ -1,16 +1,9 @@
 (in-package :cl-user)
 
 (defpackage :bknr.indices
-  (:use :cl
-	#+clisp :ext
-	#+sbcl :sb-ext
-	:cl-user
-	:bknr.utils
-	:bknr.skip-list
-	#+allegro :aclmop
-	#+cmu :pcl
-	#+openmcl :openmcl-mop
-	#+sbcl :sb-pcl)
+  (:use :closer-common-lisp
+        :bknr.utils
+	:bknr.skip-list)
   (:export #:index-add
 	   #:index-get
 	   #:index-remove
