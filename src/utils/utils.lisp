@@ -9,11 +9,14 @@
 ;; Zeitzone fuer Mail-Zeitstempel
 (defparameter *mail-timezone* "+0100")
 
+(defun month-name (month)
+  (elt #("Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec") (1- month)))
+
 (defun format-date-time (&optional universal-time &key stream
 			 (show-year t) (show-month t)
 			 (show-date t) (show-time t) (show-weekday nil)
 			 (show-seconds t)
-			 vms-style mail-style xml-style js-style)
+			 vms-style us-style mail-style xml-style js-style)
   (or show-date show-time
       (warn "format-date-time: show-date and show-time are nil, nothing printed"))
   (multiple-value-bind (sec min hour day month year weekday)
@@ -27,8 +30,11 @@
 	(mail-style
 	 (format s "~A, ~2,'0D ~A ~4D ~2,'0D:~2,'0D:~2,'0D ~A"
 		 (elt #("Mon" "Tue" "Wed" "Thu" "Fri" "Sat" "Sun") weekday)
-		 day (elt #("Jan" "Feb" "Mar" "Apr" "May" "Jun" "Jul" "Aug" "Sep" "Oct" "Nov" "Dec") (1- month)) year
+		 day (month-name month) year
 		 hour min sec *mail-timezone*))
+	(us-style
+	 (format s "~A ~2,'0D, ~A"
+		 (month-name month) day year))
 	(vms-style
 	 (when show-date
 	   (setf month (nth (- month 1) '("JAN" "FEB" "MAR" "APR" "MAY" "JUN" "JUL" "AUG" "SEP" "OCT" "NOV" "DEC")))
@@ -133,6 +139,78 @@
     (format nil
 	    "~d~2,'0d~2,'0d"
 	    year month date)))
+
+;;; run shell command and return output as string
+;;; (lifted out of ASDF)
+
+(defun run-shell-command-to-string (control-string &rest args)
+  "Interpolate ARGS into CONTROL-STRING as if by FORMAT, and
+synchronously execute the result using a Bourne-compatible shell.
+  Returns the output and the shell's exit code."
+  (let* ((result)
+	 (command (apply #'format nil control-string args))
+	 (str (with-output-to-string (s)
+		(setf result (run-shell-command command s)))))
+    (values str result)))
+
+(defun run-shell-command (command s)
+  #+abcl
+  (ext:run-shell-command command :output s)
+  
+  #+allegro
+  ;; will this fail if command has embedded quotes - it seems to work
+  (multiple-value-bind (stdout stderr exit-code)
+      (excl.osi:command-output
+       (format nil "~a -c \"~a\""
+	       #+mswindows "sh" #-mswindows "/bin/sh" command)
+       :input nil :whole nil
+       #+mswindows :show-window #+mswindows :hide)
+    (format s "~{~&; ~a~%~}~%" stderr)
+    (format s "~{~&; ~a~%~}~%" stdout)
+    exit-code)
+
+  #+clisp                     ;XXX not exactly s, I know
+  (ext:run-shell-command  command :output :terminal :wait t)
+
+  #+clozure
+  (nth-value 1
+	     (ccl:external-process-status
+	      (ccl:run-program "/bin/sh" (list "-c" command)
+			       :input nil :output s
+			       :wait t)))
+  
+  #+ecl ;; courtesy of Juan Jose Garcia Ripoll
+  (si:system command)
+
+  #+gcl
+  (lisp:system command)
+
+  #+lispworks
+  (system:call-system-showing-output
+   command
+   :shell-type "/bin/sh"
+   :show-cmd nil
+   :prefix ""
+   :output-stream s)
+
+  #+sbcl
+  (sb-ext:process-exit-code
+   (apply #'sb-ext:run-program
+	  #+win32 "sh" #-win32 "/bin/sh"
+	  (list  "-c" command)
+	  :input nil :output s
+	  #+win32 '(:search t) #-win32 nil))
+
+  #+(or cmu scl)
+  (ext:process-exit-code
+   (ext:run-program
+    "/bin/sh"
+    (list  "-c" command)
+    :input nil :output s))
+
+  #-(or abcl allegro clisp clozure cmu ecl gcl lispworks sbcl scl)
+  (error "RUN-SHELL-COMMAND not implemented for this Lisp")
+  )
 
 
 ;;; local hostname
