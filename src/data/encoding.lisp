@@ -362,16 +362,17 @@
         (pushnew symbol symbols)))))
 
 (defun find-symbol-interactively (package-name symbol-name usage)
-  (let ((keyword (string-equal package-name "KEYWORD")))
+  (let ((intern (or (string-equal package-name "KEYWORD")
+                    (null usage))))
     (restart-case
         (multiple-value-bind (symbol status)
-            (funcall (if keyword
+            (funcall (if intern
                          #'intern
                          #'find-symbol)
                      symbol-name
                      (or (find-package package-name)
                          (error "package ~A for symbol ~A~@[ naming ~A~] not found" package-name symbol-name usage)))
-          (if (or keyword status)
+          (if (or intern status)
               symbol
               (error "symbol ~A~@[ naming ~A~] not found in package ~A" symbol-name usage package-name)))
       (use-other-symbol (new-symbol)
