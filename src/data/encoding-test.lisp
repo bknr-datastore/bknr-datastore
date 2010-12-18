@@ -1,7 +1,7 @@
 (in-package :bknr.datastore)
 
-(test:def-suite :bknr.datastore)
-(test:in-suite :bknr.datastore)
+(5am:def-suite :bknr.datastore)
+(5am:in-suite :bknr.datastore)
 
 (defun files-identical-content-p (path-a path-b)
   "Are files of PATH-A and PATH-B byte per byte identical?"
@@ -37,10 +37,10 @@
 (defmacro test-encoding (name value)
   (let ((options (arnesi:ensure-list name)))
     (destructuring-bind (name &key skip) options
-      `(test:test ,name
+      `(5am:test ,name
                   ,(if skip
-                       `(test:skip ,skip)
-                       `(test:is (congruent-p ,value (copy-by-encoding ,value))))))))
+                       `(5am:skip ,skip)
+                       `(5am:is (congruent-p ,value (copy-by-encoding ,value))))))))
 
 (test-encoding list.1 '(1 2 3))
 (test-encoding list.len.30 (loop repeat 30 collect 'x))
@@ -97,32 +97,32 @@
 (test-encoding char.3 #\Rubout)
 (test-encoding char.4 (code-char 255))
 
-(test:test char.random
-           (test:for-all ((char (test:gen-character)))
-                         (test:is (char= char (copy-by-encoding char)))))
+(5am:test char.random
+           (5am:for-all ((char (5am:gen-character)))
+                         (5am:is (char= char (copy-by-encoding char)))))
 
 ;; strings
-(test:test string.random
-           (test:for-all ((string (test:gen-string)))
-                         (test:is (string= string (copy-by-encoding string)))))
+(5am:test string.random
+           (5am:for-all ((string (5am:gen-string)))
+                         (5am:is (string= string (copy-by-encoding string)))))
 
-(test:test string.random.code-limited
-           (test:for-all ((string (test:gen-string :elements (test:gen-character :code-limit 10000))))
-                         (test:is (string= string (copy-by-encoding string)))))
+(5am:test string.random.code-limited
+           (5am:for-all ((string (5am:gen-string :elements (5am:gen-character :code-limit 10000))))
+                         (5am:is (string= string (copy-by-encoding string)))))
 
-(test:test string.decode-utf-8
+(5am:test string.decode-utf-8
            (labels ((decode-string-from-octets (octets)
                       (flexi-streams:with-input-from-sequence (in octets)
                         (bknr.datastore::%decode-string in))))
-             (test:is (string-equal "<=>" (decode-string-from-octets #(1 3 60 61 62))))
+             (5am:is (string-equal "<=>" (decode-string-from-octets #(1 3 60 61 62))))
              ;; #\? is the substitution char
              (string-equal "<?>" (decode-string-from-octets #(1 3 60 188 62)))
              ;; kilian 2008-03-20: the following for-all test failed on ccl,
              ;; because the correct utf-8 sequence could produce a char-code
              ;; above char-code-limit - bknr.datastore::%decode-string should
              ;; throw an error in this case, but I dont know how to test this
-             ;; (test:for-all ((octets (test:gen-buffer)))
-             ;;       (test:finishes (decode-string-from-octets (concatenate 'vector (vector 1 (length octets)) octets))))
+             ;; (5am:for-all ((octets (5am:gen-buffer)))
+             ;;       (5am:finishes (decode-string-from-octets (concatenate 'vector (vector 1 (length octets)) octets))))
              ))
 
 ;; #+(or (and sbcl sb-unicode) lispworks clisp acl)
@@ -233,9 +233,9 @@
 ;; to (make-hash-table) with ecl.
 
 #-openmcl(test-encoding hash.1 (make-hash-table))
-#+openmcl(test:test hash.1 (test:skip "the hash-table-size is not preserved - do we need to fix this?"))
+#+openmcl(5am:test hash.1 (5am:skip "the hash-table-size is not preserved - do we need to fix this?"))
 #-openmcl(test-encoding hash.2 (make-hash-table :test #'equal))
-#+openmcl(test:test hash.2 (test:skip "the hash-table-size is not preserved - do we need to fix this?"))
+#+openmcl(5am:test hash.2 (5am:skip "the hash-table-size is not preserved - do we need to fix this?"))
 
 ;; (defvar *hash* (let ((in (make-hash-table :test #'equal
 ;;                                           :rehash-threshold 0.4 :size 20
@@ -244,7 +244,7 @@
 ;;                  in))
 
 ;; (test-encoding hash.3 *hash*)
-(test:test hash.3 (test:skip "will be fixed later - http://trac.common-lisp.net/bknr/ticket/29"))
+(5am:test hash.3 (5am:skip "will be fixed later - http://trac.common-lisp.net/bknr/ticket/29"))
 
 ;; ;; packages
 ;; (test-encoding package.1 (find-package :cl-store))
@@ -669,6 +669,6 @@
 
 ;; (defun run-tests (backend)
 ;;   (with-backend backend
-;;     (regression-test:do-tests))
+;;     (regression-5am:do-tests))
 ;;   (when (probe-file *test-file*)
 ;;     (ignore-errors (delete-file *test-file*))))
