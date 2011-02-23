@@ -9,7 +9,7 @@
 
 (defvar *objects-written*)
 
-(defmacro write-to-xml (object &key name (output *standard-output*) (indentation 3) (canonical nil))
+(defmacro write-to-xml (object &key name (output '*standard-output*) (indentation 3) (canonical nil))
   `(let ((*objects-written* (make-hash-table :test #'equal))
          (cxml::*current-element* nil)
          (sink (cxml:make-character-stream-sink ,output :indentation ,indentation :canonical ,canonical)))
