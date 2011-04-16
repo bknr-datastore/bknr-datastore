@@ -13,4 +13,5 @@
         (when (and (slot-boundp object (closer-mop:slot-definition-name slotdef))
                    (not (find (closer-mop:slot-definition-name slotdef) *ignore-slots*)))
           (json:encode-object-element (closer-mop:slot-definition-name slotdef)
+          (json:encode-object-element (string-downcase (symbol-name (closer-mop:slot-definition-name slotdef)))
                                       (slot-value object (closer-mop:slot-definition-name slotdef))))))))
