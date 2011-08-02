@@ -566,12 +566,18 @@ it is assumed that the string specifies the MIME type."
 	nconc (list key (eval value))))
 
 #-allegro
-(defun file-contents (pathname &key (element-type '(unsigned-byte 8)))
-  (with-open-file (s pathname :element-type element-type)
-    (let ((result
-           (make-array (file-length s) :element-type element-type)))
-      (read-sequence result s)
-      result)))
+(defun file-contents (pathname &key (element-type '(unsigned-byte 8)) (external-format :utf-8))
+  (cond
+    ((equal element-type '(unsigned-byte 8))
+     (with-open-file (s pathname :element-type element-type)
+       (let ((result
+              (make-array (file-length s) :element-type element-type)))
+         (read-sequence result s)
+         result)))
+    ((equal element-type 'character)
+     (alexandria:read-file-into-string pathname :external-format external-format))
+    (t
+     (error "unsupported element type ~A for file-contents" element-type))))
 
 (defun class-subclasses (class)
   "Return a list of the names of all subclasses of a given class."
