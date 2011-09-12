@@ -420,7 +420,7 @@ synchronously execute the result using a Bourne-compatible shell.
 (defun md5-string (input-string)
   (apply #'concatenate 'string (mapcar #'(lambda (c)
 					   (format nil "~2,'0X" c))
-				       (coerce (#+cmu md5sum-sequence #+sbcl md5sum-string input-string) 'list))))
+				       (coerce (#+(or cmu ccl) md5sum-sequence #+sbcl md5sum-string input-string) 'list))))
 
 #+(or)
 (defun md5-string (string)
