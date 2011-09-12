@@ -96,6 +96,8 @@
     nil)
   (:method ((slotd persistent-effective-slot-definition))
     (slot-value slotd 'relaxed-object-reference))
+  (:method ((slotd persistent-direct-slot-definition))
+    (slot-value slotd 'relaxed-object-reference))
   (:documentation "Return whether the given slot definition specifies
 that the slot is relaxed.  If a relaxed slot holds a pointer to
 another persistent object and the pointed-to object is deleted, slot
