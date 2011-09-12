@@ -19,6 +19,7 @@
     :depends-on (:cl-interpol :cl-ppcre
 			      :md5
                               :flexi-streams
+                              :alexandria
                               :bordeaux-threads)
 
     :components ((:module "statistics" :components ((:file "package")
