@@ -9,8 +9,6 @@
 	   #:index-remove
 	   #:index-keys
 	   #:index-values
-	   #:index-initialize
-	   #:index-reinitialize
 	   #:index-clear
 	   #:index-create
 	   #:index-mapvalues

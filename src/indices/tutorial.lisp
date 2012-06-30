@@ -103,7 +103,7 @@
 ;;; `HASH-LIST-INDEX'.
 ;;;
 ;;; `INDEX-INITARGS' - Additional arguments that are passed to
-;;; `INDEX-INITIALIZE' when creating the index.
+;;; `INDEX-CREATE' when creating the index.
 ;;;
 ;;; `INDEX-READER' - A symbol under which a query function for the
 ;;; index will be stored.
@@ -545,9 +545,9 @@
 ;;;
 ;;; `INDEX-CLEAR (INDEX)' - Remove all indexed objects from the index.
 ;;;
-;;; In addition to this method, there is the function `INDEX-CREATE'
-;;; that instantiates an index object, and calls `INDEX-INITIALIZE' on
-;;; it.
+;;; In addition to these methods, there is the function `INDEX-CREATE'
+;;; that instantiates an index object.  It passes the `INDEX-INITARGS'
+;;; provided to the `MAKE-INSTANCE' call that creates the index.
 ;;;
 ;;; The best way to see how this methods are used is to have at look
 ;;; at the basic index `SLOT-INDEX'. A unique index indexes an object
