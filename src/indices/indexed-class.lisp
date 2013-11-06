@@ -286,7 +286,7 @@ also index subclasses of the class to which the slot belongs, default is T")
 			       :name 'destroyed-p
 			       :initform nil
 			       :class class
-			       #+(or cmu sbcl)
+			       #+cmu
 			       ,@'(:readers nil :writers nil)
 			       :initfunction #'(lambda () nil))))
     (cons destroyed-p-slot normal-slots)))
