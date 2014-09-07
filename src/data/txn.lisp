@@ -143,10 +143,10 @@
   (declare (ignore store store-existed-p)))
 
 (defmethod initialize-instance :before ((store store) &key (make-default t) directory)
-  (assert (not (or (null directory)
-		   (pathname-type directory)
-		   (pathname-name directory)))
-	  () (format nil "Please supply a valid store directory. ~s is not a valid one." directory))
+  (assert (and (not (null directory))
+               (not (pathname-type directory))
+               (not (pathname-name directory)))
+          () (format nil "the store :directory argument ~S that was supplied is invalid.  A directory pathname must be specified." directory))
   (when make-default
     (restart-case
         (when (and (boundp '*store*)
