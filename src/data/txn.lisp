@@ -147,8 +147,6 @@
 		   (pathname-type directory)
 		   (pathname-name directory)))
 	  () (format nil "Please supply a valid store directory. ~s is not a valid one." directory))
-  (when (stringp directory)
-    (setf directory (pathname directory)))
   (when make-default
     (restart-case
         (when (and (boundp '*store*)
@@ -159,6 +157,8 @@
         (close-store)))))
 
 (defmethod initialize-instance :after ((store store) &key (make-default t))
+  (when (stringp (store-directory store))
+    (setf (store-directory store) (pathname (store-directory store))))
   (when make-default
     (setf *store* store))
   (with-store (store)
