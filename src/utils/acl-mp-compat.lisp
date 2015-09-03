@@ -60,7 +60,7 @@
   #+cmu (mp:make-process function :name name))
 
 (defun destroy-process (process)
-  #+sbcl (sb-thread:destroy-thread process)
+  #+sbcl (sb-thread:terminate-thread process)
   #+openmcl (ccl:process-kill process)
   #+cmu (mp:destroy-process process))
 
