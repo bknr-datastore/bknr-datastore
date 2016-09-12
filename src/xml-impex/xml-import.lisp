@@ -1,6 +1,6 @@
 (in-package :bknr.impex)
 
-(defclass xml-class-importer ()
+(defclass xml-class-importer (sax:default-handler)
   ((dtd        :initarg :dtd :initform nil :reader importer-dtd)
    (class-hash :initarg :class-hash :accessor importer-class-hash)
    (root-elt   :initform nil :accessor importer-root-elt)
