@@ -1,6 +1,6 @@
 (in-package :bknr.impex)
 
-(defclass xml-class-importer ()
+(defclass xml-class-importer (sax:default-handler)
   ((dtd        :initarg :dtd :initform nil :reader importer-dtd)
    (class-hash :initarg :class-hash :accessor importer-class-hash)
    (root-elt   :initform nil :accessor importer-root-elt)
@@ -67,7 +67,10 @@
   (with-slots (class elmdef slots children) instance
     (let ((slot (xml-class-body-slot class)))
       (when slot
-        (setf (gethash slot slots) (slot-parse-value slot characters))))))
+        (setf (gethash slot slots)
+              (concatenate 'string
+                           (gethash slot slots)
+                           (slot-parse-value slot characters)))))))
 
 (defmethod importer-add-element ((handler xml-class-importer)
                                (node xml-node) element value)
