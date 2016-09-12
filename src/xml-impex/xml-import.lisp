@@ -67,7 +67,10 @@
   (with-slots (class elmdef slots children) instance
     (let ((slot (xml-class-body-slot class)))
       (when slot
-        (setf (gethash slot slots) (slot-parse-value slot characters))))))
+        (setf (gethash slot slots)
+              (concatenate 'string
+                           (gethash slot slots)
+                           (slot-parse-value slot characters)))))))
 
 (defmethod importer-add-element ((handler xml-class-importer)
                                (node xml-node) element value)
