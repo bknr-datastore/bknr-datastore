@@ -1,6 +1,6 @@
 # bknr.datastore
 
-Precompiled bknr (and bknr.datastore) documentation can be found at [bknr's home-page](http://bknr.net/html/home.html).  Uncompiled documentation is enclosed in this repository.
+An in-memory CLOS based data store.
 
 # installing through quicklisp
 
