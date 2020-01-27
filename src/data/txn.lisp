@@ -498,7 +498,7 @@ to the log file in an atomic group"))
   #+cmu
   (unix:unix-fsync (kernel::fd-stream-fd stream))
   #+sbcl
-  (sb-posix:fsync (sb-kernel::fd-stream-fd stream)))
+  (sb-posix:fsync (sb-sys:fd-stream-fd stream)))
 
 (defvar *disable-sync* nil)
 
