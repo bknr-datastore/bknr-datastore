@@ -78,7 +78,7 @@
 
 
 
-(eval-when (:compile-toplevel :execute)
+(eval-when (:compile-toplevel :load-toplevel :execute)
   (defclass persistent-effective-slot-definition (index-effective-slot-definition)
     ((relaxed-object-reference :initarg :relaxed-object-reference
                                :initform nil)
@@ -157,12 +157,13 @@ reads will return nil.")))
                (format stream "The transient slot ~A in class ~A was defined as having an initarg, which is not supported"
                        slot-name (class-name class))))))
 
-(defmethod direct-slot-definition-class ((class persistent-class) &key initargs transient #-lispworks name &allow-other-keys)
-  ;; It might be better to do the error checking in an
-  ;; initialize-instance method of persistent-direct-slot-definition
-  (when (and initargs transient)
-    (error 'transient-slot-cannot-have-initarg :class class #-lispworks :slot-name #-lispworks name))
-  'persistent-direct-slot-definition)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+ (defmethod direct-slot-definition-class ((class persistent-class) &key initargs transient name &allow-other-keys)
+   ;; It might be better to do the error checking in an
+   ;; initialize-instance method of persistent-direct-slot-definition
+   (when (and initargs transient)
+     (error 'transient-slot-cannot-have-initarg :class class  :slot-name name))
+   'persistent-direct-slot-definition))
 
 (defmethod effective-slot-definition-class ((class persistent-class) &key &allow-other-keys)
   'persistent-effective-slot-definition)
