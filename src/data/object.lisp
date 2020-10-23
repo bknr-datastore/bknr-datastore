@@ -70,15 +70,14 @@
                               evolution, please snapshot your datastore.~%"
                        (class-name class)))))
 
-(defclass persistent-direct-slot-definition (index-direct-slot-definition)
-  ((relaxed-object-reference :initarg :relaxed-object-reference
-                             :initform nil)
-   (transient :initarg :transient
-              :initform nil)))
-
-
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass persistent-direct-slot-definition (index-direct-slot-definition)
+    ((relaxed-object-reference :initarg :relaxed-object-reference
+                               :initform nil)
+     (transient :initarg :transient
+                :initform nil)))
+
   (defclass persistent-effective-slot-definition (index-effective-slot-definition)
     ((relaxed-object-reference :initarg :relaxed-object-reference
                                :initform nil)
