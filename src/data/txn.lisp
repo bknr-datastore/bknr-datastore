@@ -725,9 +725,6 @@ pathname until a non-existant directory name has been found."
   (unix:unix-truncate (ext:unix-namestring pathname) position)
   #+sbcl
   (sb-posix:truncate (namestring pathname) position)
-  #+openmcl
-  (ccl:with-cstrs ((filename (namestring pathname)))
-    (#_truncate filename position))
   #-(or cmu sbcl openmcl)
   (error "don't know how to truncate files on this platform"))
 
