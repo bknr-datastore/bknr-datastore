@@ -24,7 +24,8 @@
                :bknr.indices
                :yason
                :trivial-utf-8
-               #+sbcl :sb-posix)
+               #+sbcl :sb-posix
+               #+lispworks :float-features)
 
   :components ((:module "data" :components ((:file "package")
                                             (:file "encoding" :depends-on ("package"))
@@ -34,7 +35,7 @@
                                             (:file "json" :depends-on ("object"))
                                             (:file "blob" :depends-on ("txn" "object" "package"))))))
 
-(defsystem :bknr.datastore.test  
+(defsystem :bknr.datastore.test
   :depends-on (:bknr.datastore :fiveam :cl-store :bknr.utils)
   :components ((:module "data" :components ((:file "encoding-test")
                                             (:file "object-tests")))))

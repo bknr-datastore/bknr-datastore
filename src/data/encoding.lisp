@@ -96,6 +96,9 @@
 ;;; Array (saves all standard array attributes except for displacedness)
 ;;;     tag     #\a
 ;;;     type    %symbol           ARRAY-ELEMENT-TYPE
+;;;     type-list %list
+;;;               present only if %symbol is 'new-list-type, if so it's
+;;;               the actualy ARRAY-ELEMENT-TYPE to use.
 ;;;     flags   byte
 ;;;               bit 0: array is a vector
 ;;;               bit 1: array is adjustable
@@ -233,7 +236,9 @@
   #+openmcl
   (%encode-int32 (ccl::single-float-bits object) stream)
   #+sbcl
-  (%encode-int32 (sb-kernel:single-float-bits object) stream))
+  (%encode-int32 (sb-kernel:single-float-bits object) stream)
+  #+lispworks
+  (%encode-integer (float-features:single-float-bits object) stream))
 
 (defun encode-single-float (object stream)
   (%write-tag #\f stream)
@@ -253,14 +258,24 @@
     (%encode-int32 lo stream))
   #+sbcl
   (progn (%encode-int32 (sb-kernel:double-float-high-bits object) stream)
-         (%encode-int32 (sb-kernel:double-float-low-bits object) stream)))
+         (%encode-int32 (sb-kernel:double-float-low-bits object) stream))
+  #+lispworks
+  (let* ((int (float-features:double-float-bits object)))
+    (%encode-integer int stream)))
 
 (defun encode-double-float (object stream)
   (%write-tag #\d stream)
   (%encode-double-float object stream))
 
 (defun %encode-array (object stream)
-  (%encode-symbol (array-element-type object) stream)
+  (let ((type (array-element-type object)))
+   (cond
+     ((symbolp type)
+      (%encode-symbol type stream))
+     (type
+      ;; backward compatiblity for types that are not symbols
+      (%encode-symbol 'new-list-type stream)
+      (%encode-list type stream))))
   (let* ((vectorp (typep object 'vector))
          (fill-pointer-p (array-has-fill-pointer-p object))
          (flags (logior (if vectorp 1 0)
@@ -420,7 +435,9 @@
   #+openmcl
   (make-single-float (%decode-sint32 stream))
   #+sbcl
-  (sb-kernel:make-single-float (%decode-sint32 stream)))
+  (sb-kernel:make-single-float (%decode-sint32 stream))
+  #+lispworks
+  (float-features:bits-single-float (%decode-integer stream)))
 
 (defun %decode-double-float (stream)
   #+allegro
@@ -436,10 +453,17 @@
                      (%decode-uint32 stream))
   #+sbcl
   (sb-kernel:make-double-float (%decode-sint32 stream)
-                               (%decode-uint32 stream)))
+                               (%decode-uint32 stream))
+  #+lispworks
+  (float-features:bits-double-float (%decode-integer stream)))
 
 (defun %decode-array (stream)
-  (let* ((element-type (%decode-symbol stream :usage "array element type"))
+  (let* ((element-type
+           (let ((type (%decode-symbol stream :usage "array element type")))
+             (cond
+               ((eql 'new-list-type type)
+                (%decode-list stream))
+               (t type))))
          (flags (read-byte stream))
          (vectorp (logbitp 0 flags))
          (adjustablep (logbitp 1 flags))
@@ -498,7 +522,7 @@
                        (expt 0.5 23))))
          (* sign (expt 2.0 expt) mant)))))
 
-#+openmcl
+#+(or openmcl lispworks)
 (defun make-double-float (hi lo)
   (cond
     ;; IEEE float special cases

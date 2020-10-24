@@ -35,7 +35,7 @@
       (decode in))))
 
 (defmacro test-encoding (name value)
-  (let ((options (arnesi:ensure-list name)))
+  (let ((options (ensure-list name)))
     (destructuring-bind (name &key skip) options
       `(5am:test ,name
                   ,(if skip
@@ -232,9 +232,9 @@
 ;; for some reason (make-hash-table) is not equalp
 ;; to (make-hash-table) with ecl.
 
-#-openmcl(test-encoding hash.1 (make-hash-table))
+#-openmcl(test-encoding hash.1 (make-hash-table :size 0))
 #+openmcl(5am:test hash.1 (5am:skip "the hash-table-size is not preserved - do we need to fix this?"))
-#-openmcl(test-encoding hash.2 (make-hash-table :test #'equal))
+#-openmcl(test-encoding hash.2 (make-hash-table :size 0 :test #'equal))
 #+openmcl(5am:test hash.2 (5am:skip "the hash-table-size is not preserved - do we need to fix this?"))
 
 ;; (defvar *hash* (let ((in (make-hash-table :test #'equal
