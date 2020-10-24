@@ -72,7 +72,6 @@ to get the keys stored in the index")
 also index subclasses of the class to which the slot belongs, default is T")
 
    (class :initform nil
-          :initarg :class
 	  :accessor index-direct-slot-definition-class)))
 
 (defclass index-effective-slot-definition (standard-effective-slot-definition)
