@@ -71,28 +71,27 @@
                        (class-name class)))))
 
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defclass persistent-direct-slot-definition (index-direct-slot-definition)
-    ((relaxed-object-reference :initarg :relaxed-object-reference
-                               :initform nil)
-     (transient :initarg :transient
-                :initform nil)))
+(defclass persistent-direct-slot-definition (index-direct-slot-definition)
+  ((relaxed-object-reference :initarg :relaxed-object-reference
+                             :initform nil)
+   (transient :initarg :transient
+              :initform nil)))
 
-  (defclass persistent-effective-slot-definition (index-effective-slot-definition)
-    ((relaxed-object-reference :initarg :relaxed-object-reference
-                               :initform nil)
-     (transient :initarg :transient
-                :initform nil)))
+(defclass persistent-effective-slot-definition (index-effective-slot-definition)
+  ((relaxed-object-reference :initarg :relaxed-object-reference
+                             :initform nil)
+   (transient :initarg :transient
+              :initform nil)))
 
- (defgeneric transient-slot-p (slotd)
-   (:method ((slotd t))
-     t)
-   (:method ((slotd persistent-direct-slot-definition))
-     (slot-value slotd 'transient))
-   (:method ((slotd persistent-effective-slot-definition))
-     (slot-value slotd 'transient)))
+(defgeneric transient-slot-p (slotd)
+  (:method ((slotd t))
+    t)
+  (:method ((slotd persistent-direct-slot-definition))
+    (slot-value slotd 'transient))
+  (:method ((slotd persistent-effective-slot-definition))
+    (slot-value slotd 'transient)))
 
- (defgeneric relaxed-object-reference-slot-p (slotd)
+(defgeneric relaxed-object-reference-slot-p (slotd)
   (:method ((slotd t))
     nil)
   (:method ((slotd persistent-effective-slot-definition))
@@ -102,7 +101,7 @@
   (:documentation "Return whether the given slot definition specifies
 that the slot is relaxed.  If a relaxed slot holds a pointer to
 another persistent object and the pointed-to object is deleted, slot
-reads will return nil.")))
+reads will return nil."))
 
 
 
