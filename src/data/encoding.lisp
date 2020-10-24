@@ -525,7 +525,7 @@
                        (expt 0.5 23))))
          (* sign (expt 2.0 expt) mant)))))
 
-#+(or openmcl lispworks)
+#+openmcl
 (defun make-double-float (hi lo)
   (cond
     ;; IEEE float special cases
