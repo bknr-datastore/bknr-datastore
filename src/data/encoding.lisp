@@ -238,7 +238,7 @@
   #+sbcl
   (%encode-int32 (sb-kernel:single-float-bits object) stream)
   #+lispworks
-  (%encode-integer (float-features:single-float-bits object) stream))
+  (%encode-int32 (float-features:single-float-bits object) stream))
 
 (defun encode-single-float (object stream)
   (%write-tag #\f stream)
@@ -437,7 +437,7 @@
   #+sbcl
   (sb-kernel:make-single-float (%decode-sint32 stream))
   #+lispworks
-  (float-features:bits-single-float (%decode-integer stream)))
+  (float-features:bits-single-float (%decode-sint32 stream)))
 
 (defun %decode-double-float (stream)
   #+allegro
