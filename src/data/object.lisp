@@ -103,8 +103,6 @@ that the slot is relaxed.  If a relaxed slot holds a pointer to
 another persistent object and the pointed-to object is deleted, slot
 reads will return nil."))
 
-
-
 (defun undo-set-slot (object slot-name value)
   (if (eq value 'unbound)
       (slot-makunbound object slot-name)
