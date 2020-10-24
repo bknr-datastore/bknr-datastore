@@ -297,23 +297,39 @@ also index subclasses of the class to which the slot belongs, default is T")
 
 (defvar *indexed-class-override* nil)
 
-(defmethod slot-value-using-class :before ((class indexed-class) object slot)
+(defmethod slot-value-using-class :before ((class indexed-class) object
+                                           (slot slot-definition))
   (when (and (not (eql (slot-definition-name slot) 'destroyed-p))
 	     (object-destroyed-p object)
 	     (not *indexed-class-override*))
     (error "Can not get slot ~A of destroyed object of class ~a."
-	   (slot-definition-name slot) (class-name (class-of object)))))
+	       (slot-definition-name slot) (class-name (class-of object)))))
+
+#+lispworks
+(defmethod slot-value-using-class ((class indexed-class) object
+                                   (slot symbol))
+  (slot-value-using-class class
+                          object
+                          (clos:find-slot-definition slot class)))
 
 (defmethod (setf slot-value-using-class) :before
-    (newvalue (class indexed-class) object slot)
+    (newvalue (class indexed-class) object (slot slot-definition))
   (declare (ignore newvalue))
   (when (and (not (eql (slot-definition-name slot) 'destroyed-p))
 	     (object-destroyed-p object)
 	     (not *indexed-class-override*))
     (error "Can not set slot ~A of destroyed object ~a."
-	   (slot-definition-name slot) (class-name (class-of object)))))
+	       (slot-definition-name slot) (class-name (class-of object)))))
 
-(defmethod slot-makunbound-using-class :before ((class indexed-class) object slot)
+#+lispworks
+(defmethod (setf slot-value-using-class)
+    (newvalue (class indexed-class) object (slot symbol))
+  (setf (slot-value-using-class class object
+                                (clos:find-slot-definition slot class))
+        newvalue))
+
+(defmethod slot-makunbound-using-class :before ((class indexed-class) object
+                                                (slot slot-definition))
   (when (and (not (eql (if (symbolp slot)
 			   slot
 			   (slot-definition-name slot))
@@ -321,7 +337,13 @@ also index subclasses of the class to which the slot belongs, default is T")
 	     (object-destroyed-p object)
 	     (not *indexed-class-override*))
     (error "Can not MAKUNBOUND slot ~A of destroyed object ~a."
-	   (slot-definition-name slot) (class-name (class-of object)))))
+	       (slot-definition-name slot) (class-name (class-of object)))))
+
+#+lispworks
+(defmethod slot-makunbound-using-class ((class indexed-class) object
+                                        (slot slot-definition))
+  (slot-makunbound-using-class class object
+                               (clos:find-slot-definition slot class)))
 
 (defvar *in-make-instance-p* nil)
 
@@ -343,6 +365,7 @@ also index subclasses of the class to which the slot belongs, default is T")
 	(dolist (index added-indices)
 	  (index-remove index object))))
     object))
+
 
 (defmethod (setf slot-value-using-class) :around
     (newvalue (class indexed-class) object (slot index-effective-slot-definition))
