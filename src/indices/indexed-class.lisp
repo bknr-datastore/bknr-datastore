@@ -251,12 +251,12 @@ also index subclasses of the class to which the slot belongs, default is T")
 
 ;;; avoid late instantiation
 
-#+(or allegro cmu openmcl sbcl)
+#+(or allegro cmu openmcl sbcl lispworks)
 (defmethod initialize-instance :after ((class indexed-class) &key)
   (compute-class-indices class (indexed-class-index-definitions class))
   (reinitialize-class-indices class))
 
-#+(or allegro cmu openmcl sbcl)
+#+(or allegro cmu openmcl sbcl lispworks)
 (defmethod reinitialize-instance :after ((class indexed-class) &key)
   (compute-class-indices class (indexed-class-index-definitions class))
   (reinitialize-class-indices class))
