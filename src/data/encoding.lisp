@@ -261,7 +261,8 @@
          (%encode-int32 (sb-kernel:double-float-low-bits object) stream))
   #+lispworks
   (let* ((int (float-features:double-float-bits object)))
-    (%encode-integer int stream)))
+    (%encode-int32 (ldb (byte 32 32) int) stream)
+    (%encode-int32 (ldb (byte 32 0) int) stream)))
 
 (defun encode-double-float (object stream)
   (%write-tag #\d stream)
@@ -455,7 +456,9 @@
   (sb-kernel:make-double-float (%decode-sint32 stream)
                                (%decode-uint32 stream))
   #+lispworks
-  (float-features:bits-double-float (%decode-integer stream)))
+  (let ((hi (%decode-uint32 stream))
+        (lo (%decode-uint32 stream)))
+    (float-features:bits-double-float (logior (ash hi 32) lo))))
 
 (defun %decode-array (stream)
   (let* ((element-type
