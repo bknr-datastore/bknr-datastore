@@ -348,9 +348,13 @@ also index subclasses of the class to which the slot belongs, default is T")
 
 #+lispworks
 (defmethod slot-makunbound-using-class ((class indexed-class) object
-                                        (slot slot-definition))
-  (slot-makunbound-using-class class object
-                               (clos:find-slot-definition slot class)))
+                                        (slot symbol))
+  (let ((slot-def (clos:find-slot-definition slot class)))
+    (unless slot-def
+      (error "Did not find slot ~S in ~S"
+             slot class))
+   (slot-makunbound-using-class class object
+                                slot-def)))
 
 (defvar *in-make-instance-p* nil)
 
