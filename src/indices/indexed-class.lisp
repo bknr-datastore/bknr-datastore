@@ -307,9 +307,13 @@ also index subclasses of the class to which the slot belongs, default is T")
 #+lispworks
 (defmethod slot-value-using-class ((class indexed-class) object
                                    (slot symbol))
-  (slot-value-using-class class
-                          object
-                          (clos:find-slot-definition slot class)))
+  (let ((slot-def (clos:find-slot-definition slot class)))
+    (unless slot-def
+      (error "Did not find slot ~S in ~S"
+             slot class))
+    (slot-value-using-class class
+                            object
+                           slot-def)))
 
 (defmethod (setf slot-value-using-class) :before
     (newvalue (class indexed-class) object (slot slot-definition))
@@ -323,9 +327,13 @@ also index subclasses of the class to which the slot belongs, default is T")
 #+lispworks
 (defmethod (setf slot-value-using-class)
     (newvalue (class indexed-class) object (slot symbol))
-  (setf (slot-value-using-class class object
-                                (clos:find-slot-definition slot class))
-        newvalue))
+  (let ((slot-def (clos:find-slot-definition slot class)))
+    (unless slot-def
+      (error "Did not find slot ~S in ~S"
+             slot class))
+    (setf (slot-value-using-class class object
+                                  slot-def)
+          newvalue)))
 
 (defmethod slot-makunbound-using-class :before ((class indexed-class) object
                                                 (slot slot-definition))

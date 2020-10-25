@@ -710,6 +710,11 @@ pathname until a non-existant directory name has been found."
 
 (defvar *show-transactions* nil)
 
+#+ (and lispworks linux)
+(cffi:defcfun (ffi-truncate "truncate") :int
+  (path :string)
+  (pos :long))
+
 (defun truncate-log (pathname position)
   (let ((backup (make-pathname :type "backup" :defaults pathname)))
     (report-progress "~&; creating log file backup: ~A~%" backup)
@@ -725,7 +730,9 @@ pathname until a non-existant directory name has been found."
   (unix:unix-truncate (ext:unix-namestring pathname) position)
   #+sbcl
   (sb-posix:truncate (namestring pathname) position)
-  #-(or cmu sbcl openmcl)
+  #+lispworks
+  (ffi-truncate (namestring pathname) position)
+  #-(or cmu sbcl openmcl (and lispworks linux))
   (error "don't know how to truncate files on this platform"))
 
 (defun load-transaction-log (pathname &key until)

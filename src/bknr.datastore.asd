@@ -25,7 +25,8 @@
                :yason
                :trivial-utf-8
                #+sbcl :sb-posix
-               #+lispworks :float-features)
+               #+lispworks :float-features
+               #+lispworks :cffi)
 
   :components ((:module "data" :components ((:file "package")
                                             (:file "encoding" :depends-on ("package"))
