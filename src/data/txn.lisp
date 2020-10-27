@@ -730,7 +730,7 @@ pathname until a non-existant directory name has been found."
   (unix:unix-truncate (ext:unix-namestring pathname) position)
   #+sbcl
   (sb-posix:truncate (namestring pathname) position)
-  #+lispworks
+  #+(or openmcl (and lispworks linux))
   (ffi-truncate (namestring pathname) position)
   #-(or cmu sbcl openmcl (and lispworks linux))
   (error "don't know how to truncate files on this platform"))
