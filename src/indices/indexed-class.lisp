@@ -231,7 +231,7 @@ also index subclasses of the class to which the slot belongs, default is T")
 	  (pushnew (index-holder-index holder)
 		   (index-effective-slot-definition-indices slot)))))))
 
-#+allegro
+#+(or allegro lispworks)
 (defmethod finalize-inheritance :after ((class indexed-class))
   (compute-class-indices class (indexed-class-index-definitions class))
   (reinitialize-class-indices class))
