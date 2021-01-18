@@ -156,7 +156,7 @@ synchronously execute the result using a Bourne-compatible shell.
 (defun run-shell-command (command s)
   #+abcl
   (ext:run-shell-command command :output s)
-  
+
   #+allegro
   ;; will this fail if command has embedded quotes - it seems to work
   (multiple-value-bind (stdout stderr exit-code)
@@ -178,7 +178,7 @@ synchronously execute the result using a Bourne-compatible shell.
 	      (ccl:run-program "/bin/sh" (list "-c" command)
 			       :input nil :output s
 			       :wait t)))
-  
+
   #+ecl ;; courtesy of Juan Jose Garcia Ripoll
   (si:system command)
 
@@ -252,20 +252,21 @@ synchronously execute the result using a Bourne-compatible shell.
 		       (namestring file2)))
 
 (defun make-temporary-pathname (&key (defaults nil) (name "tmp"))
-  (loop for file = (make-pathname :name (format nil "~A-~A-~A"
-						name
-                                                (get-universal-time)
-                                                (random most-positive-fixnum))
-                                  :defaults defaults)
-        while (probe-file file)
-        finally (return file)))
+  (let ((args (when defaults `(:defaults ,defaults))))
+   (loop for file = (apply 'make-pathname :name (format nil "~A-~A-~A"
+						                                name
+                                                        (get-universal-time)
+                                                        (random most-positive-fixnum))
+                            args)
+         while (probe-file file)
+         finally (return file))))
 
 (defmacro with-temporary-file ((var &rest args) &body body)
   `(let ((,var (make-temporary-pathname ,@args)))
      (unwind-protect
 	  (progn ,@body)
        (when (probe-file ,var)
-	 (delete-file ,var)))))     
+	 (delete-file ,var)))))
 
 (defun parent-directory (pathname)
   (make-pathname :directory (butlast (pathname-directory pathname))
@@ -308,7 +309,7 @@ synchronously execute the result using a Bourne-compatible shell.
 	when (funcall test elt (car rest))
 	do (return (subseq seen 0 (+ 1 depth i)))
 	do (if (>= i depth) (setf seen (cdr seen)) (incf i))))
-       
+
 (defun assoc-to-keywords (args)
   (loop for (key . value) in args
 	nconc (list (make-keyword-from-string key) value)))
@@ -324,7 +325,7 @@ synchronously execute the result using a Bourne-compatible shell.
       (let ((key (funcall key el)))
         (unless (nth-value 1 (gethash key hash))
           (push key keys))
-        (push el (gethash key hash))))    
+        (push el (gethash key hash))))
     (mapcar (lambda (key) (let ((keys (nreverse (gethash key hash))))
                             (if include-key
                                 (cons key keys)
@@ -370,7 +371,7 @@ synchronously execute the result using a Bourne-compatible shell.
   "Find all those elements of sequence that match item,
   according to the keywords.  Doesn't alter sequence."
   (if test-not
-      (apply #'remove item sequence 
+      (apply #'remove item sequence
              :test-not (complement test-not) keyword-args)
       (apply #'remove item sequence
              :test (complement test) keyword-args)))
@@ -469,8 +470,8 @@ it is assumed that the string specifies the MIME type."
 		     ((< code #x80) ; ASCII
 		      (write-char char stream)
 		      (incf index 1))
-		     ((< code #xC0) 
-		      
+		     ((< code #xC0)
+
 		      ;; We are in the middle of a multi-byte sequence!
 		      ;; This should never happen, so we raise an error.
 		      (error "Encountered illegal multi-byte sequence."))
