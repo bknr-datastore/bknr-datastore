@@ -35,7 +35,7 @@
       (decode in))))
 
 (defmacro test-encoding (name value)
-  (let ((options (arnesi:ensure-list name)))
+  (let ((options (alexandria:ensure-list name)))
     (destructuring-bind (name &key skip) options
       `(5am:test ,name
                   ,(if skip
