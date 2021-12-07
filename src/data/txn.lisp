@@ -497,7 +497,8 @@ to the log file in an atomic group"))
   (finish-output stream)
   #+cmu
   (unix:unix-fsync (kernel::fd-stream-fd stream))
-  #+sbcl
+  ;; SBCL defines FSYNC only under non-win32 systems.
+  #+(and sbcl (not win32))
   (sb-posix:fsync (sb-sys:fd-stream-fd stream)))
 
 (defvar *disable-sync* nil)
@@ -723,7 +724,8 @@ pathname until a non-existant directory name has been found."
   (report-progress "~&; truncating transaction log at position ~D.~%" position)
   #+cmu
   (unix:unix-truncate (ext:unix-namestring pathname) position)
-  #+sbcl
+  ;; SBCL defines TRUNCATE only under non-win32 systems.
+  #+(and sbcl (not win32))
   (sb-posix:truncate (namestring pathname) position)
   #+openmcl
   (ccl:with-cstrs ((filename (namestring pathname)))
