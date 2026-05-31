@@ -115,7 +115,16 @@
                :initarg :subsystems)
    (transaction-run-time :accessor store-transaction-run-time
                          :initform 0
-                         :documentation "The total run time of all application transaction code since last snapshot"))
+                         :documentation "The total run time of all application transaction code since last snapshot")
+   (transaction-counter :accessor store-transaction-counter
+                        :initform 0
+                        :documentation "Monotonic count of top-level transactions
+appended to the log.  Persisted at snapshot and advanced both on commit and
+during log replay.  Serves as a log sequence number (LSN) for observers.")
+   (commit-observers :accessor store-commit-observers
+                     :initform nil
+                     :documentation "List of functions called after each committed
+transaction with the arguments (store transaction encoded-bytes lsn)."))
   (:default-initargs
    :guard #'funcall
     :log-guard #'funcall
@@ -250,6 +259,25 @@ want to change the store permanently."
                      :direction :output :if-does-not-exist :create :if-exists :supersede)
     (with-standard-io-syntax
       (prin1 (store-random-state store) f))))
+
+(defmethod store-transaction-id-pathname ((store store))
+  (merge-pathnames #P"transaction-id" (store-current-directory store)))
+
+(defun update-store-transaction-id (store)
+  "Persist the current LSN baseline (transaction-counter) to disk."
+  (with-open-file (f (store-transaction-id-pathname store)
+                     :direction :output :if-does-not-exist :create :if-exists :supersede)
+    (with-standard-io-syntax
+      (prin1 (store-transaction-counter store) f))))
+
+(defun ensure-store-transaction-id (store)
+  "Read the persisted LSN baseline for STORE, defaulting to 0 for stores written
+before this facility existed (backward compatible)."
+  (setf (store-transaction-counter store)
+        (if (probe-file (store-transaction-id-pathname store))
+            (with-open-file (f (store-transaction-id-pathname store))
+              (with-standard-io-syntax (let ((*read-eval* nil)) (read f))))
+            0)))
 
 (defgeneric store-transaction-log-pathname (store-or-directory)
   (:documentation "Return the pathname of the current transaction log of STORE"))
@@ -491,6 +519,33 @@ to the log file in an atomic group"))
                         :tx-name (transaction-function-symbol transaction)))
              (transaction-args transaction)))))
 
+;;; Commit observers / replication hook
+
+(defgeneric transaction-committed (store transaction encoded-bytes lsn)
+  (:documentation "Called after TRANSACTION has been durably appended to the
+transaction log of STORE.  ENCODED-BYTES is the serialized transaction record
+exactly as written to the log, and LSN is its monotonic log sequence number.
+The default method calls each function in STORE-COMMIT-OBSERVERS.")
+  (:method ((store store) transaction encoded-bytes lsn)
+    (dolist (observer (store-commit-observers store))
+      (funcall observer store transaction encoded-bytes lsn))))
+
+(defun add-commit-observer (function &optional (store *store*))
+  "Register FUNCTION to be called after each committed transaction.  See
+TRANSACTION-COMMITTED for the calling convention.  Returns FUNCTION."
+  ;; Serialize with the commit path, which reads the observer list under the log
+  ;; guard; the recursive lock makes this safe even from inside a transaction.
+  (with-log-guard (store)
+    (pushnew function (store-commit-observers store)))
+  function)
+
+(defun remove-commit-observer (function &optional (store *store*))
+  "Remove FUNCTION from the commit observers of STORE."
+  (with-log-guard (store)
+    (setf (store-commit-observers store)
+          (remove function (store-commit-observers store))))
+  function)
+
 (defun fsync (stream)
   ;; FINISH-OUTPUT macht leider auch nichts anderes als FORCE-OUTPUT,
   ;; dabei waere sync()-Semantik zu erwarten.
@@ -511,6 +566,28 @@ to the log file in an atomic group"))
       (with-log-guard ()
         (fsync (store-transaction-log-stream *store*)))))
 
+(defun commit-transaction-to-log (transaction)
+  "Append TRANSACTION to the transaction log of *STORE*, fsync (unless disabled),
+assign the next LSN and notify commit observers.  When observers are registered
+the record is encoded into a buffer first, so the exact bytes can be handed to
+them; otherwise it is streamed straight to the log as before."
+  (with-log-guard ()
+    (let ((out (store-transaction-log-stream *store*))
+          (lsn (incf (store-transaction-counter *store*))))
+      (cond
+        ((store-commit-observers *store*)
+         (let ((bytes (let ((buffer (flex:make-in-memory-output-stream)))
+                        (encode transaction buffer)
+                        (flex:get-output-stream-sequence buffer))))
+           (write-sequence bytes out)
+           (unless *disable-sync*
+             (fsync out))
+           (transaction-committed *store* transaction bytes lsn)))
+        (t
+         (encode transaction out)
+         (unless *disable-sync*
+           (fsync out)))))))
+
 (defmacro with-transaction-log ((transaction) &body body)
   (check-type transaction symbol) ; otherwise care for multiple evaluation
   `(with-store-guard ()
@@ -520,11 +597,7 @@ to the log file in an atomic group"))
        (prog1
            (let ((*current-transaction* ,transaction))
              ,@body)
-         (with-log-guard ()
-           (let ((out (store-transaction-log-stream *store*)))
-             (encode ,transaction out)
-             (unless *disable-sync*
-               (fsync out))))))))
+         (commit-transaction-to-log ,transaction)))))
 
 (defvar *transaction-statistics* (make-statistics-table))
 
@@ -696,6 +769,7 @@ pathname until a non-existant directory name has been found."
             (unwind-protect
                  (with-store-state (:snapshot)
                    (update-store-random-state store)
+                   (update-store-transaction-id store)
                    (dolist (subsystem (store-subsystems store))
                      (when *store-debug*
                        (report-progress "Snapshotting subsystem ~A of ~A~%" subsystem store))
@@ -752,7 +826,8 @@ pathname until a non-existant directory name has been found."
                 (when *show-transactions*
                   (report-progress "~&;;; ~A txn @~D: ~A~%" (transaction-timestamp txn) position txn))
                 (let ((*txn-log-stream* s))
-                  (execute-unlogged txn))))))
+                  (execute-unlogged txn))
+                (incf (store-transaction-counter *store*))))))
       (discard ()
         :report (lambda (stream) (format stream "Discard transaction log before failing transaction ~A." txn))
         (truncate-log pathname position)
@@ -767,6 +842,7 @@ pathname until a non-existant directory name has been found."
 
 (defmethod restore-store ((store store) &key until)
   (ensure-store-random-state store)
+  (ensure-store-transaction-id store)
   (report-progress "restoring ~A~%" store)
   (let ((*store* store))
     (setf (store-state store) :opened)
