@@ -5,3 +5,7 @@ An in-memory CLOS based data store.  Some documentation is linked from the ancie
 # installing through quicklisp
 
 Please use [Quicklisp](http://quicklisp.org/) to install bknr-datastore
+
+We have decided to no longer accept issues or pull requests for this repository.  We are no longer using bknr.datastore because Common Lisp is not a great target for LLM based development tools, and we're basically just leaving it here as a monument of better times, when humans wrote code and the code was fun (and, as we think, beautiful).
+
+Some forks of bknr.datastore exist and are being used.  Feel free to create your own.
