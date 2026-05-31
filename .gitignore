@@ -1,2 +1,4 @@
 *~
 *.*f*sl
+# built CLI binary (produced by `ros build bin/bknr-repl.ros`)
+/bin/bknr-repl

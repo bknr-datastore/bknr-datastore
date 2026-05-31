@@ -346,6 +346,21 @@
     (assert (plusp n))                  ;n==0 geben wir nicht aus
     (%decode-integer/fixed stream n)))
 
+(defparameter *max-decoded-length* (expt 2 32)
+  "Sanity bound on a single decoded sequence length (string bytes, or list /
+array / hash-table element count).  Turns an unbounded allocation from a corrupt
+or hostile length field into a bounded one and rejects absurd values, without
+rejecting any realistic store -- this decoder also loads the store's own on-disk
+snapshot/log, so the default is deliberately generous.  It is NOT a tuned DoS
+budget: at 2^32, an array or (make-hash-table :size n) can still request tens of
+GiB from one length field.  Rebind it lower around DECODE when decoding
+untrusted input that needs a stricter allocation budget.")
+
+(defun %check-decoded-length (n)
+  (when (> n *max-decoded-length*)
+    (error "decoded length ~D exceeds *max-decoded-length* (~D)" n *max-decoded-length*))
+  n)
+
 (defun %decode-rational (stream)
   (/ (%decode-integer stream)
      (%decode-integer stream)))
@@ -368,7 +383,7 @@
                  (trivial-utf-8:utf-8-bytes-to-string octets)
                (trivial-utf-8:utf-8-decoding-error ()
                  (octets-to-string-safe octets)))))
-    (let* ((n (%decode-integer stream))
+    (let* ((n (%check-decoded-length (%decode-integer stream)))
            (buffer (make-array n :element-type '(unsigned-byte 8))))
       (assert (= n (read-sequence buffer stream)))
       (octets-to-string buffer))))
@@ -411,7 +426,7 @@
       (find-symbol-interactively package-name symbol-name usage))))
 
 (defun %decode-list (stream)
-  (let* ((n (%decode-integer stream))
+  (let* ((n (%check-decoded-length (%decode-integer stream)))
          (result (loop repeat n collect (decode stream)))
          (tail (and (plusp n) (decode stream))))
     (when tail
@@ -421,7 +436,7 @@
 (defun %decode-hash-table (stream)
   (let* ((test (%decode-symbol stream :usage "hash table test"))
          (rehash-size (%decode-double-float stream))
-         (n (%decode-integer stream))
+         (n (%check-decoded-length (%decode-integer stream)))
          (result (make-hash-table :test test :size n :rehash-size rehash-size)))
     (dotimes (x n)
       (let ((key (decode stream))
@@ -475,16 +490,17 @@
          (dimensions
           (if vectorp
               (list (%decode-integer stream))
-              (loop repeat (%decode-integer stream)
+              (loop repeat (%check-decoded-length (%decode-integer stream))
                  collect (%decode-integer stream))))
          (fill-pointer
           (if fill-pointer-p
               (%decode-integer stream)
               nil))
-         (result (make-array dimensions
-                             :element-type element-type
-                             :adjustable adjustablep
-                             :fill-pointer fill-pointer)))
+         (result (progn (%check-decoded-length (reduce #'* dimensions))
+                        (make-array dimensions
+                                    :element-type element-type
+                                    :adjustable adjustablep
+                                    :fill-pointer fill-pointer))))
     (dotimes (i (reduce #'* dimensions))
       (setf (row-major-aref result i) (decode stream)))
     result))

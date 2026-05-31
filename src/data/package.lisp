@@ -31,6 +31,13 @@
            #:open-store
            #:close-store
 
+           ;; replication / commit hooks
+           #:store-transaction-counter
+           #:store-commit-observers
+           #:transaction-committed
+           #:add-commit-observer
+           #:remove-commit-observer
+
            ;; transaction
            #:transaction
            #:transaction-function-symbol

@@ -33,6 +33,7 @@
   :components ((:module "data"
                 :components
                 ((:file "encoding-test")
-                 (:file "object-tests"))))
+                 (:file "object-tests")
+                 (:file "replication-hooks-test"))))
   :perform (test-op (o c)
              (symbol-call :fiveam :run! :bknr.datastore)))

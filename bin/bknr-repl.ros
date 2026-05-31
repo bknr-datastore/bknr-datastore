@@ -1,0 +1,253 @@
+#!/bin/sh
+#|-*- mode:lisp -*-|#
+#|
+exec ros -Q -- $0 "$@"
+|#
+
+;;;; bknr-repl -- a tiny CLI to demonstrate bknr.datastore log-shipping
+;;;; replication live in two terminals.
+;;;;
+;;;;   Terminal 1:  bknr-repl primary
+;;;;   Terminal 2:  bknr-repl standby
+;;;;
+;;;; Type "say <text>" in the primary; watch it appear in the standby in real
+;;;; time. The same binary contains both roles and the shared domain code, so a
+;;;; standby can replay the primary's transactions.
+
+(progn ;; init: make the bknr systems loadable (relative to this script) and load them
+  (ros:ensure-asdf)
+  (let* ((here (or *load-pathname* *load-truename*))
+         (src (and here
+                   (merge-pathnames #P"../src/"
+                                    (make-pathname :directory (pathname-directory here))))))
+    (when (and src (probe-file src))
+      (pushnew src asdf:*central-registry* :test #'equal)))
+  #+quicklisp (ql:quickload '(:bknr.datastore.replication :bknr.datastore.replication/tls) :silent t))
+
+(defpackage :ros.script.bknr-repl
+  (:use :cl :bknr.datastore :bknr.datastore.replication))
+(in-package :ros.script.bknr-repl)
+
+;;;; ---------------------------------------------------------------------------
+;;;; Shared domain (compiled into the binary, so primary and standby agree)
+
+(defclass message (store-object)
+  ((text :initarg :text :accessor message-text :initform ""))
+  (:metaclass persistent-class))
+
+(defun all-messages ()
+  (sort (copy-list (class-instances 'message)) #'< :key #'store-object-id))
+
+(defun describe-txn (txn)
+  "A short human label for an applied transaction, so the standby can tell a real
+change from internal bookkeeping (e.g. the PREPARE-FOR-SNAPSHOT marker that a
+snapshot writes to the log)."
+  (let ((fsym (ignore-errors (transaction-function-symbol txn))))
+    (cond
+      ((typep txn 'bknr.datastore::anonymous-transaction)
+       (format nil "checkpoint ~A" (bknr.datastore::anonymous-transaction-label txn)))
+      ((eq fsym 'make-instance) "new message")
+      ((and fsym (string= (symbol-name fsym) "TX-DELETE-OBJECT")) "delete")
+      (t "update"))))
+
+(defun open-store-dir (dir &key reset)
+  "Open the store in DIR.  With RESET, wipe it first; otherwise the primary
+persists across restarts (so a restarted primary keeps its data, epoch and LSN,
+letting a replica RESUME instead of re-bootstrapping)."
+  (when reset
+    (uiop:delete-directory-tree dir :validate t :if-does-not-exist :ignore))
+  (ensure-directories-exist dir)
+  (make-instance 'mp-store :directory dir))
+
+;;;; ---------------------------------------------------------------------------
+;;;; Argument parsing
+
+(defun opt (opts key default)
+  (loop for (k v) on opts by #'cddr when (equal k key) return v
+        finally (return default)))
+
+(defun command-loop (prompt dispatch)
+  "Read trimmed lines until EOF or 'quit', calling PROMPT before each read and
+DISPATCH on each non-blank line.  DISPATCH returns non-NIL if it handled the
+line; NIL prints an 'unknown command' notice."
+  (loop
+    (funcall prompt)
+    (let ((line (read-line *standard-input* nil :eof)))
+      (when (eq line :eof) (return))
+      (setf line (string-trim '(#\Space #\Tab #\Return) line))
+      (cond ((string= line "") nil)
+            ((string= line "quit") (return))
+            ((funcall dispatch line) nil)
+            (t (format t "  ? unknown command: ~A~%" line))))))
+
+;;;; ---------------------------------------------------------------------------
+;;;; Roles
+
+(defun run-primary (dir host port reset secret make-stream)
+  (let ((store (open-store-dir dir :reset reset)))
+    (declare (ignorable store))
+    (let ((server (start-replication-server store :host host :port port :secret secret
+                                            :make-stream make-stream)))
+      (format t "~&primary: store ~A (~:[persistent~;reset~])~%~
+                 primary: serving replicas on ~A:~A~%~
+                 commands:  say <text> | del <id> | list | clients | status | snapshot | quit~%"
+              dir reset host port)
+      (unwind-protect
+           (command-loop
+            (lambda () (format t "~&> ") (force-output))
+            (lambda (line)
+              (cond
+                ((string= line "list")
+                 (let ((ms (all-messages)))
+                   (if ms
+                       (dolist (m ms) (format t "  #~D  ~A~%" (store-object-id m) (message-text m)))
+                       (format t "  (no messages)~%")))
+                 t)
+                ((string= line "clients")
+                 (format t "  ~D replica(s) connected~%" (replica-count server)) t)
+                ((string= line "status")
+                 (format t "  LSN ~D | ~D replica(s) | ~D object(s)~%"
+                         (store-transaction-counter store)
+                         (replica-count server)
+                         (length (all-messages)))
+                 t)
+                ((string= line "snapshot")
+                 (snapshot) (format t "  snapshotted~%") t)
+                ((and (> (length line) 4) (string= (subseq line 0 4) "say "))
+                 (let ((m (make-instance 'message :text (subseq line 4))))
+                   (format t "  committed #~D (LSN ~D)~%"
+                           (store-object-id m) (store-transaction-counter store)))
+                 t)
+                ((and (> (length line) 4) (string= (subseq line 0 4) "del "))
+                 (let* ((id (parse-integer (subseq line 4) :junk-allowed t))
+                        (obj (and id (store-object-with-id id))))
+                   (cond
+                     ((and obj (typep obj 'message))
+                      (delete-object obj)
+                      (format t "  deleted #~D (LSN ~D)~%" id (store-transaction-counter store)))
+                     (t (format t "  no message #~A~%" (subseq line 4)))))
+                 t)
+                (t nil))))
+        (stop-replication-server server)
+        (format t "~&primary: bye~%")))))
+
+(defparameter *prompt* "standby> ")
+
+(defun reprompt ()
+  (format t "~A" *prompt*) (force-output))
+
+(defun standby-on-apply (s txn lsn)
+  (declare (ignore s))
+  (let ((ms (all-messages)))
+    (format t "~&[replica] LSN ~D  ~A  |  ~D message(s)  |  latest: ~A~%"
+            lsn (describe-txn txn) (length ms)
+            (when ms (message-text (car (last ms)))))
+    (reprompt)))
+
+(defun standby-replicate (dir host port follow secret make-stream)
+  "Background: replicate from the primary via the library's RUN-REPLICA, which
+bootstraps on first connect and resumes from the last applied LSN on reconnect
+(falling back to a full bootstrap when the primary epoch changed).  Policy here:
+reconnect iff FOLLOW."
+  (run-replica
+   dir host port
+   :reconnect follow
+   :secret secret
+   :make-stream make-stream
+   :on-apply #'standby-on-apply
+   :on-sync (lambda (state mode lsn)
+              (declare (ignore state))
+              (format t "~&standby: in sync (~(~A~), LSN ~D) — ~D message(s); now streaming live~%"
+                      mode lsn (length (all-messages)))
+              (reprompt))
+   :on-disconnect (lambda (state)
+                    (declare (ignore state))
+                    (format t "~&standby: primary disconnected; data retained.~:[~; reconnecting...~]~%"
+                            follow)
+                    (reprompt))
+   :on-error (lambda (e state)
+               (declare (ignore state))
+               (if (or (typep e 'usocket:connection-refused-error)
+                       (typep e 'stream-error) (typep e 'end-of-file)
+                       (search "SSL" (princ-to-string e)))
+                   ;; transport-level: a disconnect, not an app error (TLS close
+                   ;; surfaces as an SSL error rather than a clean EOF)
+                   (progn
+                     (format t "~&standby: primary disconnected; data retained.~:[~; reconnecting...~]~%"
+                             follow)
+                     (reprompt))
+                   (progn (format t "~&standby: ~A~%" e) (reprompt))))))
+
+(defun standby-repl ()
+  "Foreground: a read-only REPL so you can inspect the replica's state at any
+time -- including after the primary has died."
+  (format t "~&standby: read-only REPL.  commands: list | count | lsn | status | help | quit~%")
+  (command-loop
+   #'reprompt
+   (lambda (line)
+     (cond
+       ((or (string= line "list") (string= line "ls"))
+        (let ((ms (all-messages)))
+          (if ms
+              (dolist (m ms) (format t "  #~D  ~A~%" (store-object-id m) (message-text m)))
+              (format t "  (no messages yet)~%")))
+        t)
+       ((string= line "count") (format t "  ~D message(s)~%" (length (all-messages))) t)
+       ((string= line "lsn") (format t "  applied LSN ~D~%" (replica-applied-lsn)) t)
+       ((string= line "status")
+        (format t "  applied LSN ~D | ~D message(s)~%"
+                (replica-applied-lsn) (length (all-messages)))
+        t)
+       ((string= line "help")
+        (format t "  commands: list | count | lsn | status | help | quit~%") t)
+       (t nil)))))
+
+(defun run-standby (dir host port follow secret make-stream)
+  "Open a replica store, apply the primary's stream in a background thread, and
+run a read-only REPL in the foreground.  The REPL outlives the primary so you
+can confirm the replicated data is retained after the primary dies.  'quit' to
+exit."
+  (format t "~&standby: store ~A~%standby: connecting to ~A:~A ...~%" dir host port)
+  (bordeaux-threads:make-thread
+   (lambda () (standby-replicate dir host port follow secret make-stream))
+   :name "replica")
+  (standby-repl))
+
+(defun plain-stream (socket) (usocket:socket-stream socket))
+
+;;;; ---------------------------------------------------------------------------
+;;;; Entry point
+
+(defun main (&rest argv)
+  (destructuring-bind (&optional cmd &rest opts) argv
+    (let* ((follow (and (member "--follow" opts :test #'equal) t))
+           (reset  (and (member "--reset" opts :test #'equal) t))
+           (opts (remove "--follow" (remove "--reset" opts :test #'equal) :test #'equal))
+           (host (opt opts "--host" "127.0.0.1"))
+           (port (parse-integer (opt opts "--port" "9100")))
+           (secret (opt opts "--secret" nil))   ; else BKNR_REPL_SECRET[_FILE]
+           (tls   (and (member "--tls" opts :test #'equal) t))
+           (opts  (remove "--tls" opts :test #'equal))
+           (tls-cert (opt opts "--tls-cert" nil))
+           (tls-key  (opt opts "--tls-key" nil))
+           (dir  (pathname (opt opts "--dir"
+                                (format nil "/tmp/bknr-repl-~A/" (or cmd "x"))))))
+      (cond
+        ((equal cmd "primary")
+         (run-primary dir host port reset secret
+                      (if (and tls-cert tls-key)
+                          (bknr.replication.tls:make-tls-server-stream-fn
+                           :certificate tls-cert :key tls-key)
+                          #'plain-stream)))
+        ((equal cmd "standby")
+         (run-standby dir host port follow secret
+                      (if tls
+                          (bknr.replication.tls:make-tls-client-stream-fn) ; self-signed demo: no verify
+                          #'plain-stream)))
+        (t (format t "~&usage: bknr-repl primary|standby [--dir D] [--host H] [--port P] [--secret S] [--follow] [--reset]~%")
+           (format t "  primary   serve replicas, accept 'say <text>' / 'del <id>' commands (persists; --reset to wipe)~%")
+           (format t "  standby   replicate; read-only REPL (list|count|lsn|quit); --follow to reconnect+resume~%")
+           (format t "  --secret  shared secret for mutual auth (else BKNR_REPL_SECRET / BKNR_REPL_SECRET_FILE)~%")
+           (format t "  TLS:      primary --tls-cert CERT.pem --tls-key KEY.pem ; standby --tls~%"))))))
+
+;;; vim: set ft=lisp lisp:
